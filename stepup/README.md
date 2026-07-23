@@ -17,19 +17,48 @@ class they attend.
 
 - Next.js 16 (App Router, Server Actions, Turbopack)
 - TypeScript, Tailwind CSS v4
-- Prisma ORM 7 + SQLite (`better-sqlite3` driver adapter)
+- Prisma ORM 7 + PostgreSQL (`pg` driver adapter)
 - Auth.js (NextAuth v5) with email/password credentials, JWT sessions
 
 ## Getting started
 
+You need a Postgres database to point at — any Postgres works (Vercel
+Postgres, Neon, Supabase, a local instance, etc.).
+
 ```bash
-npm install
-npx prisma migrate deploy   # create the SQLite database
+npm install                 # also generates the Prisma client (postinstall)
+```
+
+Create a `.env` file:
+
+```env
+DATABASE_URL="postgresql://user:password@host:5432/dbname?sslmode=require"
+AUTH_SECRET="<run: openssl rand -base64 32>"
+```
+
+```bash
+npx prisma migrate deploy   # create the schema
 npx tsx prisma/seed.ts      # seed demo studios, instructors, students & classes
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## Deploying (Vercel)
+
+1. Import this repo into a new Vercel project.
+2. Add a Postgres database from Vercel's Storage tab (or connect an external
+   one) — this auto-populates `POSTGRES_PRISMA_URL` / `POSTGRES_URL` /
+   `POSTGRES_URL_NON_POOLING`, which the app and migrations pick up
+   automatically. If you'd rather set it explicitly, add a `DATABASE_URL` env
+   var yourself — it takes priority.
+3. Add an `AUTH_SECRET` env var (`openssl rand -base64 32`).
+4. Deploy. The `vercel-build` script runs `prisma migrate deploy`
+   automatically on every deploy, so the schema stays in sync — it does
+   **not** re-run the seed script, since that would wipe production data.
+5. To seed the deployed database once, run
+   `DATABASE_URL="<production connection string>" npx tsx prisma/seed.ts`
+   locally (or via `vercel env pull` to get the same value).
 
 ## Demo accounts
 

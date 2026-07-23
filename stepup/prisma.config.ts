@@ -4,11 +4,13 @@ import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 // Prefer a direct (non-pooled) connection for migrations when available —
-// pooled/pgbouncer connections (e.g. Vercel's POSTGRES_PRISMA_URL) don't
-// reliably support the advisory locks Prisma Migrate needs.
+// pooled/pgbouncer connections (e.g. Neon's DATABASE_URL, Vercel's
+// POSTGRES_PRISMA_URL) don't reliably support the advisory locks Prisma
+// Migrate needs.
 const migrationUrl =
-  process.env["DATABASE_URL"] ??
+  process.env["DATABASE_URL_UNPOOLED"] ??
   process.env["POSTGRES_URL_NON_POOLING"] ??
+  process.env["DATABASE_URL"] ??
   process.env["POSTGRES_PRISMA_URL"] ??
   process.env["POSTGRES_URL"];
 

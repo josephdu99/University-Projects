@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,119 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+}
+
+// STUDENT        - takes classes, in person or online
+// STUDIO_OWNER   - runs a physical studio, hosts in-person (or streamed) classes
+// INSTRUCTOR     - independent teacher with no studio, hosts online classes only
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String
+  bio          String?
+  homeCity     String?
+  avatarEmoji  String   @default("🕺")
+  avatarColor  String   @default("#FC5200")
+  createdAt    DateTime @default(now())
+
+  studio       Studio?           @relation("StudioOwner")
+  hostedClasses DanceClass[]     @relation("ClassHost")
+  bookings     Booking[]
+  profile      GamificationProfile?
+  badges       UserBadge[]
+}
+
+model Studio {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  city        String
+  address     String
+  emoji       String   @default("🏢")
+  createdAt   DateTime @default(now())
+
+  ownerId String @unique
+  owner   User   @relation("StudioOwner", fields: [ownerId], references: [id])
+
+  classes DanceClass[]
+}
+
+// FORMAT: "IN_PERSON" | "ONLINE"
+// LEVEL:  "ALL_LEVELS" | "BEGINNER" | "INTERMEDIATE" | "ADVANCED"
+model DanceClass {
+  id          String   @id @default(cuid())
+  title       String
+  style       String
+  description String
+  format      String
+  level       String   @default("ALL_LEVELS")
+  location    String?
+  onlineLink  String?
+  startTime   DateTime
+  durationMin Int      @default(60)
+  capacity    Int      @default(20)
+  points      Int      @default(20)
+  createdAt   DateTime @default(now())
+
+  hostId String
+  host   User   @relation("ClassHost", fields: [hostId], references: [id])
+
+  studioId String?
+  studio   Studio? @relation(fields: [studioId], references: [id])
+
+  bookings Booking[]
+}
+
+// STATUS: "BOOKED" | "ATTENDED" | "CANCELLED"
+model Booking {
+  id         String    @id @default(cuid())
+  status     String    @default("BOOKED")
+  bookedAt   DateTime  @default(now())
+  attendedAt DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  classId String
+  class   DanceClass @relation(fields: [classId], references: [id])
+
+  @@unique([userId, classId])
+}
+
+model GamificationProfile {
+  id             String    @id @default(cuid())
+  totalPoints    Int       @default(0)
+  currentStreak  Int       @default(0)
+  longestStreak  Int       @default(0)
+  classesTaken   Int       @default(0)
+  lastAttendedAt DateTime?
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Badge {
+  id          String @id @default(cuid())
+  code        String @unique
+  name        String
+  description String
+  emoji       String
+  sortOrder   Int    @default(0)
+
+  awards UserBadge[]
+}
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  earnedAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  badgeId String
+  badge   Badge  @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
 }

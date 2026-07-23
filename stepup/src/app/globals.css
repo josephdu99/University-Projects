@@ -1,26 +1,52 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-brand: #fc5200;
+  --color-brand-dark: #d94400;
+  --color-brand-light: #ffe6d5;
+  --color-ink: #14151a;
+  --color-ink-soft: #565968;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f5f8;
+  --color-border: #e7e8ec;
+  --color-success: #12b886;
+  --color-gold: #f5a623;
+  --radius-card: 1rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand: var(--color-brand);
+  --color-brand-dark: var(--color-brand-dark);
+  --color-brand-light: var(--color-brand-light);
+  --color-ink: var(--color-ink);
+  --color-ink-soft: var(--color-ink-soft);
+  --color-surface: var(--color-surface);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-border: var(--color-border);
+  --color-success: var(--color-success);
+  --color-gold: var(--color-gold);
+  --radius-card: var(--radius-card);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-ink: #f2f2f5;
+    --color-ink-soft: #a7a9b6;
+    --color-surface: #16171c;
+    --color-surface-muted: #1e2026;
+    --color-border: #2b2d35;
+    --color-brand-light: #3a2415;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

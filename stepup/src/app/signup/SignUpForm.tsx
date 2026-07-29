@@ -1,12 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { clsx } from "clsx";
 import { signUpAction } from "@/lib/actions/auth-actions";
-import { Button } from "@/components/ui/Button";
-import type { Role } from "@/lib/roles";
+import { SubmitButton } from "@/components/ui/SubmitButton";
+import { COMMON_TIMEZONES, DEFAULT_TIMEZONE } from "@/lib/time";
+import type { SignupRole } from "@/lib/roles";
 
-const ROLE_OPTIONS: { role: Role; emoji: string; title: string; subtitle: string }[] = [
+const ROLE_OPTIONS: {
+  role: SignupRole;
+  emoji: string;
+  title: string;
+  subtitle: string;
+}[] = [
   {
     role: "STUDENT",
     emoji: "💃",
@@ -31,8 +38,18 @@ const inputClass =
   "rounded-xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-brand";
 
 export function SignUpForm() {
-  const [role, setRole] = useState<Role>("STUDENT");
-  const [state, formAction, pending] = useActionState(signUpAction, undefined);
+  const [role, setRole] = useState<SignupRole>("STUDENT");
+  // Default to the browser's own zone so most people never touch the picker.
+  // Computed lazily as initial state rather than in an effect, which would
+  // render once with the wrong value and then immediately re-render.
+  const [timezone, setTimezone] = useState<string>(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIMEZONE
+  );
+  const [state, formAction] = useActionState(signUpAction, undefined);
+
+  const zoneOptions = Array.from(
+    new Set([timezone, ...COMMON_TIMEZONES])
+  ).filter(Boolean);
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-4">
@@ -77,11 +94,27 @@ export function SignUpForm() {
         name="password"
         type="password"
         required
-        minLength={8}
-        placeholder="Password (min. 8 characters)"
+        minLength={10}
+        placeholder="Password (min. 10 characters)"
         autoComplete="new-password"
         className={inputClass}
       />
+
+      <label className="flex flex-col gap-1 text-xs text-ink-soft">
+        Your timezone
+        <select
+          name="timezone"
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className={inputClass}
+        >
+          {zoneOptions.map((tz) => (
+            <option key={tz} value={tz}>
+              {tz.replace(/_/g, " ")}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {role !== "STUDIO_OWNER" && (
         <input name="homeCity" placeholder="City (optional)" className={inputClass} />
@@ -101,24 +134,9 @@ export function SignUpForm() {
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Your studio
           </p>
-          <input
-            name="studioName"
-            required
-            placeholder="Studio name"
-            className={inputClass}
-          />
-          <input
-            name="studioCity"
-            required
-            placeholder="City"
-            className={inputClass}
-          />
-          <input
-            name="studioAddress"
-            required
-            placeholder="Address"
-            className={inputClass}
-          />
+          <input name="studioName" required placeholder="Studio name" className={inputClass} />
+          <input name="studioCity" required placeholder="City" className={inputClass} />
+          <input name="studioAddress" required placeholder="Address" className={inputClass} />
           <textarea
             name="studioDescription"
             placeholder="Short description (optional)"
@@ -128,15 +146,35 @@ export function SignUpForm() {
         </div>
       )}
 
+      <label className="flex items-start gap-2.5 text-xs text-ink-soft">
+        <input
+          type="checkbox"
+          name="acceptTerms"
+          required
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--color-brand)]"
+        />
+        <span>
+          I agree to the{" "}
+          <Link href="/legal/terms" className="font-semibold text-brand underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/legal/privacy" className="font-semibold text-brand underline">
+            Privacy Policy
+          </Link>
+          .
+        </span>
+      </label>
+
       {state?.error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
           {state.error}
         </p>
       )}
 
-      <Button type="submit" size="lg" disabled={pending} className="mt-1 w-full">
-        {pending ? "Creating account…" : "Create account"}
-      </Button>
+      <SubmitButton size="lg" className="w-full" pendingLabel="Creating account…">
+        Create account
+      </SubmitButton>
     </form>
   );
 }

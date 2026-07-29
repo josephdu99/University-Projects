@@ -6,99 +6,181 @@ class they attend.
 
 ## Who it's for
 
-- **Dancers** — discover in-person and online classes, book in one tap, and
-  track progress on their profile.
-- **Studios** — sign up, list a venue, publish classes, and check students in
-  from a live roster.
-- **Independent instructors** — no studio required; publish live online
-  classes and build a following.
+- **Dancers** — discover in-person and online classes, book in one tap, join
+  waitlists, and track progress on their profile.
+- **Studios** — list a venue, publish one-off or weekly recurring classes,
+  take payment, and check students in from a live roster.
+- **Independent instructors** — no studio required; host live online classes
+  and get paid directly.
+- **Admins** — moderate users and studios, fix support cases, audit actions.
 
 ## Stack
 
 - Next.js 16 (App Router, Server Actions, Turbopack)
 - TypeScript, Tailwind CSS v4
 - Prisma ORM 7 + PostgreSQL (`pg` driver adapter)
-- Auth.js (NextAuth v5) with email/password credentials, JWT sessions
+- Auth.js (NextAuth v5), email/password with JWT sessions
+- Stripe Connect (Express) for marketplace payments
+- Vitest for unit tests
 
 ## Getting started
 
-You need a Postgres database to point at — any Postgres works (Vercel
-Postgres, Neon, Supabase, a local instance, etc.).
+You need a Postgres database — Vercel Postgres, Neon, Supabase, or a local
+instance all work.
 
 ```bash
 npm install                 # also generates the Prisma client (postinstall)
 ```
 
-Create a `.env` file:
+Create `.env`:
 
 ```env
 DATABASE_URL="postgresql://user:password@host:5432/dbname?sslmode=require"
-AUTH_SECRET="<run: openssl rand -base64 32>"
+AUTH_SECRET="<openssl rand -base64 32>"
+
+# Optional — the app runs without these, with the features degraded:
+RESEND_API_KEY=""           # unset: emails are logged to the console instead
+EMAIL_FROM="StepUp <onboarding@resend.dev>"
+STRIPE_SECRET_KEY=""        # unset: paid classes can't be created
+STRIPE_WEBHOOK_SECRET=""
+PLATFORM_FEE_PERCENT="10"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+SENTRY_DSN=""               # unset: errors log as structured JSON only
 ```
 
 ```bash
-npx prisma migrate deploy   # create the schema
-npx tsx prisma/seed.ts      # seed demo studios, instructors, students & classes
+npx prisma migrate deploy
+npx tsx prisma/seed.ts
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Deploying (Vercel)
+### Demo accounts
 
-1. Import this repo into a new Vercel project.
-2. Add a Postgres database from Vercel's Storage tab (or connect an external
-   one) — this auto-populates `POSTGRES_PRISMA_URL` / `POSTGRES_URL` /
-   `POSTGRES_URL_NON_POOLING`, which the app and migrations pick up
-   automatically. If you'd rather set it explicitly, add a `DATABASE_URL` env
-   var yourself — it takes priority.
-3. Add an `AUTH_SECRET` env var (`openssl rand -base64 32`).
-4. Deploy. The `vercel-build` script runs `prisma migrate deploy`
-   automatically on every deploy, so the schema stays in sync — it does
-   **not** re-run the seed script, since that would wipe production data.
-5. To seed the deployed database once, run
-   `DATABASE_URL="<production connection string>" npx tsx prisma/seed.ts`
-   locally (or via `vercel env pull` to get the same value).
-
-## Demo accounts
-
-Every seeded account uses the password `password123`.
+Password for every seeded account: `DemoPassw0rd!`
 
 | Role                   | Email                     |
-| ----------------------- | ------------------------- |
-| Dancer (rich history)   | alex@stepup.dance         |
-| Dancer (new account)    | chris@stepup.dance        |
-| Studio owner            | maria@rhythmroom.dance    |
-| Studio owner            | diego@salsacasa.dance     |
-| Studio owner            | elena@barrebeyond.dance   |
-| Independent instructor  | jay@stepup.dance          |
-| Independent instructor  | noor@stepup.dance         |
+| ---------------------- | ------------------------- |
+| Admin                  | admin@stepup.dance        |
+| Dancer (rich history)  | alex@stepup.dance         |
+| Dancer (new account)   | chris@stepup.dance        |
+| Studio owner           | maria@rhythmroom.dance    |
+| Studio owner           | diego@salsacasa.dance     |
+| Studio owner           | elena@barrebeyond.dance   |
+| Independent instructor | jay@stepup.dance          |
+| Independent instructor | noor@stepup.dance         |
+
+## Testing
+
+```bash
+npm test          # unit tests — no database required
+npm run lint
+npx tsc --noEmit
+```
+
+Concurrency and timezone guarantees need a real database, so they live in a
+separate script:
+
+```bash
+DATABASE_URL="postgresql://…" npx tsx prisma/seed.ts
+DATABASE_URL="postgresql://…" npx tsx scripts/verify-integration.ts
+```
+
+It asserts that a class can't be oversold by simultaneous bookings, that a
+double-submitted check-in awards points once, and that waitlist positions stay
+contiguous. Point it only at a disposable database.
 
 ## How gamification works
 
-See `src/lib/gamification.ts` for the full implementation.
+See `src/lib/gamification-rules.ts` (pure logic) and `src/lib/gamification.ts`
+(persistence).
 
-- **Points** are awarded per class (set by the host) when a student is
-  checked in (studio/instructor) or self-reports attendance for an online
-  class after it has started.
-- **Levels** are derived from lifetime points across ten named tiers.
-- **Streaks** count consecutive ISO weeks with at least one attended class.
-- **Badges** (10 total) are evaluated after every check-in — first class,
-  attendance milestones, streak milestones, style/studio variety, and
-  time-of-day badges (Early Bird / Night Owl).
-- **Leaderboards** show all-time and rolling 7-day standings.
+- **Points** are awarded per class when a host checks a student in, or when a
+  student enters the host's check-in code for an online class.
+- **Levels** derive from lifetime points across ten named tiers.
+- **Streaks** count consecutive ISO weeks *in the dancer's own timezone*.
+- **Badges** (10) are evaluated after every check-in — milestones, streaks,
+  style/studio variety, and time-of-day badges based on the class's local
+  wall-clock hour.
+- **Leaderboards** cover all-time and a rolling 7 days, aggregated in SQL.
+
+Points have no monetary value and can be adjusted by an admin when misuse is
+detected.
+
+## Notes on correctness
+
+A few things that are easy to get wrong and are handled deliberately:
+
+- **Timezones.** Class times are stored as UTC instants alongside the IANA
+  zone they were scheduled in. A studio entering "6pm" means 6pm *locally*,
+  which is a different instant depending on daylight saving. Times are
+  rendered in the viewer's own zone. Weekly series regenerate from local
+  wall-clock time, so a 7pm class stays at 7pm across a DST transition.
+- **Overbooking.** Booking takes a Postgres advisory lock scoped to the class,
+  so the capacity check and the insert are atomic. Serializable isolation also
+  prevents the race but aborts losing transactions, which would show real users
+  an error instead of a waitlist place.
+- **Double check-ins.** Attendance flips status via a conditional `updateMany`
+  guarded on the previous state, so a double-tapped button awards points once.
+- **Payments.** Bookings for paid classes stay `PENDING_PAYMENT` until Stripe's
+  webhook confirms, and every webhook event id is recorded so retried
+  deliveries don't double-apply.
+- **Account enumeration.** Password reset returns the same message whether or
+  not the address exists, and login compares against a dummy hash for unknown
+  users so response timing doesn't leak membership.
+
+## Deploying (Vercel)
+
+1. Import the repo into a Vercel project.
+2. Add a Postgres database from the Storage tab. Neon/Vercel populate
+   `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, which the app and migrations
+   pick up automatically.
+3. Add `AUTH_SECRET`, and the Stripe/Resend variables if you want payments and
+   real email.
+4. Deploy. `vercel-build` runs `prisma migrate deploy` on every deploy, so the
+   schema stays in sync. Seeding is deliberately *not* automatic.
+5. Point a Stripe webhook at `https://<your-domain>/api/stripe/webhook` for the
+   events `checkout.session.completed`, `checkout.session.expired`,
+   `payment_intent.payment_failed` and `account.updated`, then set
+   `STRIPE_WEBHOOK_SECRET`.
+
+`GET /api/health` returns 200 with database latency, or 503 if the database is
+unreachable — suitable for an uptime check.
+
+### Before real customers
+
+```bash
+DATABASE_URL="<production>" npx tsx prisma/reset-demo-data.ts --dry-run
+DATABASE_URL="<production>" npx tsx prisma/reset-demo-data.ts
+```
+
+This removes the seeded demo accounts and their classes, leaving real accounts
+untouched. It refuses to run if completed payments are attached to them.
+
+**Also required before launch:** the Terms of Service and Privacy Policy in
+`src/app/legal/` are drafted templates with placeholders for your legal entity,
+ABN and contact addresses. Have a lawyer review them and fill those in.
 
 ## Project structure
 
 ```
-prisma/schema.prisma        Data model
-prisma/seed.ts               Demo data (studios, instructors, students, classes)
-src/lib/auth.ts              NextAuth credentials config
-src/lib/gamification.ts      Points, levels, streaks, badges, leaderboards
-src/lib/actions/             Server Actions (auth, booking, class creation, check-in)
-src/app/(student)/           Discover, Schedule, Leaderboard, class detail
-src/app/studio/               Studio owner dashboard + roster/check-in
-src/app/teach/                 Independent instructor dashboard + roster
-src/app/profile/              Shared profile (role-aware)
-src/components/               UI primitives, nav shell, gamification widgets
+prisma/schema.prisma          Data model
+prisma/seed.ts                Demo data (refuses to run on real-looking data)
+prisma/reset-demo-data.ts     Removes demo rows from a deployed database
+scripts/verify-integration.ts Concurrency + timezone checks against real Postgres
+src/lib/time.ts               Timezone-correct conversion and formatting
+src/lib/gamification-rules.ts Pure scoring logic (unit tested)
+src/lib/gamification.ts       Attendance, streaks, badge persistence
+src/lib/booking.ts            Atomic seat reservation and waitlist
+src/lib/stripe.ts             Connect onboarding, checkout, webhooks, refunds
+src/lib/email.ts              Pluggable transactional email
+src/lib/tokens.ts             Hashed, single-use verification/reset tokens
+src/lib/rate-limit.ts         Database-backed sliding-window limiter
+src/lib/actions/              Server Actions (auth, classes, payouts, admin)
+src/app/(student)/            Discover, Schedule, Leaderboard, class detail
+src/app/studio/ · /teach/     Host dashboards + roster/check-in
+src/app/admin/                Moderation and support tooling
+src/app/legal/                Terms and Privacy (templates)
+tests/                        Vitest unit tests
 ```

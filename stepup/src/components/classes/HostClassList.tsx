@@ -1,45 +1,76 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { formatClassWhen, formatDuration } from "@/lib/format";
+import { formatClassWhen, formatDuration, formatMoney } from "@/lib/time";
 import { Tag } from "@/components/ui/Pill";
 import { Card } from "@/components/ui/Card";
 import { StatTile } from "@/components/gamification/StatTile";
 import { CreateClassForm } from "@/components/classes/CreateClassForm";
+import { PayoutPanel } from "@/components/PayoutPanel";
+
+const SEAT_HOLDING = ["BOOKED", "ATTENDED", "PENDING_PAYMENT"];
 
 export async function HostClassList({
   hostId,
   basePath,
   fixedFormat,
+  timezone,
+  canCharge,
 }: {
   hostId: string;
   basePath: "/studio" | "/teach";
   fixedFormat?: "ONLINE";
+  timezone: string;
+  canCharge: boolean;
 }) {
-  const classes = await db.danceClass.findMany({
-    where: { hostId },
-    include: {
-      _count: { select: { bookings: { where: { status: { not: "CANCELLED" } } } } },
-      bookings: { where: { status: "ATTENDED" }, select: { id: true } },
-    },
-    orderBy: { startTime: "desc" },
+  const [classes, payout, earnings] = await Promise.all([
+    db.danceClass.findMany({
+      where: { hostId },
+      include: {
+        _count: { select: { bookings: { where: { status: { in: SEAT_HOLDING } } } } },
+      },
+      orderBy: { startTime: "desc" },
+      take: 100,
+    }),
+    db.payoutAccount.findUnique({ where: { userId: hostId } }),
+    db.payment.aggregate({
+      where: { status: "PAID", booking: { class: { hostId } } },
+      _sum: { amountCents: true, feeCents: true },
+    }),
+  ]);
+
+  const attendedCount = await db.booking.count({
+    where: { class: { hostId }, status: "ATTENDED" },
   });
 
   const now = new Date();
-  const upcoming = classes.filter((c) => c.startTime >= now).reverse();
-  const past = classes.filter((c) => c.startTime < now);
-  const studentsTaught = new Set(
-    past.flatMap((c) => c.bookings.map((b) => b.id))
-  ).size;
+  const upcoming = classes
+    .filter((c) => c.startTime >= now && !c.cancelledAt)
+    .reverse();
+  const past = classes.filter((c) => c.startTime < now || c.cancelledAt);
+
+  const gross = earnings._sum.amountCents ?? 0;
+  const fees = earnings._sum.feeCents ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-3 gap-3">
         <StatTile emoji="📅" label="Upcoming" value={upcoming.length} />
         <StatTile emoji="🕺" label="Classes hosted" value={classes.length} />
-        <StatTile emoji="✅" label="Check-ins" value={studentsTaught} />
+        <StatTile emoji="✅" label="Check-ins" value={attendedCount} />
       </div>
 
-      <CreateClassForm fixedFormat={fixedFormat} />
+      <PayoutPanel
+        status={payout?.status ?? null}
+        chargesEnabled={payout?.chargesEnabled ?? false}
+        payoutsEnabled={payout?.payoutsEnabled ?? false}
+        netEarningsCents={gross - fees}
+      />
+
+      <CreateClassForm
+        fixedFormat={fixedFormat}
+        timezone={timezone}
+        canCharge={canCharge}
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-bold text-ink">Upcoming classes</h2>
@@ -60,7 +91,7 @@ export async function HostClassList({
         <div>
           <h2 className="mb-3 text-lg font-bold text-ink">Past classes</h2>
           <div className="flex flex-col gap-2.5">
-            {past.slice(0, 10).map((c) => (
+            {past.slice(0, 12).map((c) => (
               <ClassRow key={c.id} c={c} basePath={basePath} />
             ))}
           </div>
@@ -80,8 +111,13 @@ function ClassRow({
     style: string;
     format: string;
     startTime: Date;
+    timezone: string;
     durationMin: number;
     capacity: number;
+    priceCents: number;
+    currency: string;
+    cancelledAt: Date | null;
+    seriesId: string | null;
     _count: { bookings: number };
   };
   basePath: string;
@@ -95,13 +131,18 @@ function ClassRow({
             <Tag tone={c.format === "ONLINE" ? "success" : "neutral"}>
               {c.format === "ONLINE" ? "Online" : "In person"}
             </Tag>
+            {c.seriesId && <Tag>Weekly</Tag>}
+            {c.cancelledAt && <Tag tone="neutral">Cancelled</Tag>}
           </div>
           <p className="mt-1 font-semibold text-ink">{c.title}</p>
           <p className="text-sm text-ink-soft">
-            {formatClassWhen(c.startTime)} · {formatDuration(c.durationMin)}
+            {/* Host times are shown in the class's own zone. */}
+            {formatClassWhen(c.startTime, c.timezone)} ·{" "}
+            {formatDuration(c.durationMin)} ·{" "}
+            {formatMoney(c.priceCents, c.currency)}
           </p>
         </div>
-        <span className="text-sm font-semibold text-ink-soft">
+        <span className="shrink-0 text-sm font-semibold text-ink-soft">
           {c._count.bookings}/{c.capacity}
         </span>
       </Card>

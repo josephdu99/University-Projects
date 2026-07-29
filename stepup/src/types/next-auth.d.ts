@@ -6,6 +6,8 @@ declare module "next-auth" {
     role: Role;
     avatarEmoji: string;
     avatarColor: string;
+    timezone: string;
+    verified: boolean;
   }
 
   interface Session {
@@ -14,6 +16,8 @@ declare module "next-auth" {
       role: Role;
       avatarEmoji: string;
       avatarColor: string;
+      timezone: string;
+      verified: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -24,5 +28,8 @@ declare module "next-auth/jwt" {
     role: Role;
     avatarEmoji: string;
     avatarColor: string;
+    timezone: string;
+    verified: boolean;
+    suspended?: boolean;
   }
 }

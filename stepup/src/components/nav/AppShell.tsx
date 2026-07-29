@@ -18,6 +18,11 @@ const NAV_ITEMS: Record<Role, NavItem[]> = {
     { href: "/teach", label: "Dashboard", emoji: "🎥" },
     { href: "/profile", label: "Profile", emoji: "🙂" },
   ],
+  ADMIN: [
+    { href: "/admin", label: "Admin", emoji: "🛡️" },
+    { href: "/discover", label: "Discover", emoji: "🔥" },
+    { href: "/profile", label: "Profile", emoji: "🙂" },
+  ],
 };
 
 export function AppShell({

@@ -18,3 +18,23 @@ export async function requireRole(role: Role) {
   if (user.role !== role) redirect(ROLE_HOME[user.role]);
   return user;
 }
+
+export async function requireAnyRole(roles: Role[]) {
+  const user = await requireUser();
+  if (!roles.includes(user.role)) redirect(ROLE_HOME[user.role]);
+  return user;
+}
+
+export async function requireAdmin() {
+  return requireRole("ADMIN");
+}
+
+/**
+ * Gates actions that shouldn't happen on an unverified account (booking,
+ * publishing classes, taking payments). Admins bypass the check.
+ */
+export async function requireVerified() {
+  const user = await requireUser();
+  if (!user.verified && user.role !== "ADMIN") redirect("/verify-email");
+  return user;
+}

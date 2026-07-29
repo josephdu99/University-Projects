@@ -7,27 +7,84 @@ datasource db {
   provider = "postgresql"
 }
 
-// STUDENT        - takes classes, in person or online
-// STUDIO_OWNER   - runs a physical studio, hosts in-person (or streamed) classes
-// INSTRUCTOR     - independent teacher with no studio, hosts online classes only
+// ─── Users ───────────────────────────────────────────────────────────────────
+//
+// ROLE: "STUDENT" | "STUDIO_OWNER" | "INSTRUCTOR" | "ADMIN"
+//
+// STUDENT      - takes classes, in person or online
+// STUDIO_OWNER - runs a physical studio, hosts in-person (or streamed) classes
+// INSTRUCTOR   - independent teacher with no studio, hosts online classes only
+// ADMIN        - platform staff; moderation and support tooling
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   name         String
   role         String
   bio          String?
   homeCity     String?
-  avatarEmoji  String   @default("🕺")
-  avatarColor  String   @default("#FC5200")
-  createdAt    DateTime @default(now())
+  // IANA zone (e.g. "Australia/Sydney"). Used to render times for this user.
+  timezone     String    @default("Australia/Sydney")
+  avatarEmoji  String    @default("🕺")
+  avatarColor  String    @default("#FC5200")
 
-  studio       Studio?           @relation("StudioOwner")
-  hostedClasses DanceClass[]     @relation("ClassHost")
-  bookings     Booking[]
-  profile      GamificationProfile?
-  badges       UserBadge[]
+  emailVerifiedAt DateTime?
+  // Set when an admin suspends the account; suspended users cannot sign in.
+  suspendedAt     DateTime?
+  suspendedReason String?
+
+  acceptedTermsAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studio        Studio?              @relation("StudioOwner")
+  hostedClasses DanceClass[]         @relation("ClassHost")
+  hostedSeries  ClassSeries[]        @relation("SeriesHost")
+  bookings      Booking[]
+  profile       GamificationProfile?
+  badges        UserBadge[]
+  payoutAccount PayoutAccount?
+  tokens        AuthToken[]
+  auditEntries  AuditLog[]           @relation("AuditActor")
+
+  @@index([role])
+  @@index([suspendedAt])
 }
+
+// Email verification + password reset tokens. Only a hash of the token is
+// stored, so a database leak doesn't hand out working reset links.
+//
+// PURPOSE: "EMAIL_VERIFICATION" | "PASSWORD_RESET"
+model AuthToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  purpose   String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+// Rolling record of sign-in attempts, used to lock out brute-force attackers.
+// Keyed by email (not user) so attempts against unknown accounts still count.
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  email      String
+  ipHash     String?
+  successful Boolean  @default(false)
+  attemptedAt DateTime @default(now())
+
+  @@index([email, attemptedAt])
+  @@index([attemptedAt])
+}
+
+// ─── Studios & payouts ───────────────────────────────────────────────────────
 
 model Studio {
   id          String   @id @default(cuid())
@@ -35,56 +92,217 @@ model Studio {
   description String
   city        String
   address     String
+  // IANA zone the studio's local class times are expressed in.
+  timezone    String   @default("Australia/Sydney")
   emoji       String   @default("🏢")
-  createdAt   DateTime @default(now())
+
+  suspendedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   ownerId String @unique
-  owner   User   @relation("StudioOwner", fields: [ownerId], references: [id])
+  owner   User   @relation("StudioOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   classes DanceClass[]
+  series  ClassSeries[]
+
+  @@index([city])
 }
 
-// FORMAT: "IN_PERSON" | "ONLINE"
-// LEVEL:  "ALL_LEVELS" | "BEGINNER" | "INTERMEDIATE" | "ADVANCED"
-model DanceClass {
-  id          String   @id @default(cuid())
+// Stripe Connect (Express) account for a host, so class fees are paid out to
+// them directly and the platform collects an application fee.
+//
+// STATUS: "PENDING" | "ONBOARDING" | "ACTIVE" | "RESTRICTED"
+model PayoutAccount {
+  id              String   @id @default(cuid())
+  stripeAccountId String   @unique
+  status          String   @default("PENDING")
+  chargesEnabled  Boolean  @default(false)
+  payoutsEnabled  Boolean  @default(false)
+  detailsSubmitted Boolean @default(false)
+  country         String   @default("AU")
+  defaultCurrency String   @default("aud")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Classes ─────────────────────────────────────────────────────────────────
+
+// A repeating weekly timetable entry. Individual DanceClass rows (sessions)
+// are generated from it on a rolling horizon.
+//
+// FREQUENCY: "WEEKLY"
+model ClassSeries {
+  id          String  @id @default(cuid())
   title       String
   style       String
   description String
   format      String
-  level       String   @default("ALL_LEVELS")
+  level       String  @default("ALL_LEVELS")
   location    String?
   onlineLink  String?
-  startTime   DateTime
-  durationMin Int      @default(60)
-  capacity    Int      @default(20)
-  points      Int      @default(20)
-  createdAt   DateTime @default(now())
+
+  // 0 = Sunday … 6 = Saturday, in the owning studio/host's timezone.
+  dayOfWeek   Int
+  // Local wall-clock start, "HH:mm" in the owning timezone. Stored as text so
+  // it survives daylight-saving shifts (7pm stays 7pm year round).
+  localTime   String
+  timezone    String @default("Australia/Sydney")
+  frequency   String @default("WEEKLY")
+
+  durationMin Int     @default(60)
+  capacity    Int     @default(20)
+  points      Int     @default(20)
+  priceCents  Int     @default(0)
+  currency    String  @default("aud")
+
+  startsOn DateTime
+  endsOn   DateTime?
+
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   hostId String
-  host   User   @relation("ClassHost", fields: [hostId], references: [id])
+  host   User   @relation("SeriesHost", fields: [hostId], references: [id], onDelete: Cascade)
 
   studioId String?
-  studio   Studio? @relation(fields: [studioId], references: [id])
+  studio   Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
-  bookings Booking[]
+  sessions DanceClass[]
+
+  @@index([hostId])
+  @@index([archivedAt])
 }
 
-// STATUS: "BOOKED" | "ATTENDED" | "CANCELLED"
+// A single dated class session.
+//
+// FORMAT: "IN_PERSON" | "ONLINE"
+// LEVEL:  "ALL_LEVELS" | "BEGINNER" | "INTERMEDIATE" | "ADVANCED"
+model DanceClass {
+  id          String  @id @default(cuid())
+  title       String
+  style       String
+  description String
+  format      String
+  level       String  @default("ALL_LEVELS")
+  location    String?
+  onlineLink  String?
+
+  // Absolute instant, always stored in UTC.
+  startTime DateTime
+  // IANA zone the class actually happens in — needed to display and reason
+  // about its local wall-clock time (e.g. "is this an early-morning class?").
+  timezone  String   @default("Australia/Sydney")
+
+  durationMin Int @default(60)
+  capacity    Int @default(20)
+  points      Int @default(20)
+
+  priceCents Int    @default(0)
+  currency   String @default("aud")
+
+  // Short rotating code the host reveals during class; students enter it to
+  // claim attendance. Null until the host starts check-in.
+  checkInCode        String?
+  checkInCodeSetAt   DateTime?
+
+  cancelledAt     DateTime?
+  cancelledReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hostId String
+  host   User   @relation("ClassHost", fields: [hostId], references: [id], onDelete: Cascade)
+
+  studioId String?
+  studio   Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  seriesId String?
+  series   ClassSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+
+  bookings Booking[]
+
+  // One generated session per series per start time.
+  @@unique([seriesId, startTime])
+  @@index([startTime])
+  @@index([hostId])
+  @@index([studioId])
+  @@index([style])
+  @@index([cancelledAt, startTime])
+}
+
+// ─── Bookings & payments ─────────────────────────────────────────────────────
+
+// STATUS: "PENDING_PAYMENT" | "BOOKED" | "ATTENDED" | "CANCELLED" | "WAITLISTED"
 model Booking {
   id         String    @id @default(cuid())
   status     String    @default("BOOKED")
   bookedAt   DateTime  @default(now())
   attendedAt DateTime?
+  cancelledAt DateTime?
+
+  // Position in the waitlist queue; null for confirmed bookings.
+  waitlistPosition Int?
+
+  updatedAt DateTime @updatedAt
 
   userId String
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   classId String
-  class   DanceClass @relation(fields: [classId], references: [id])
+  class   DanceClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  payment Payment?
 
   @@unique([userId, classId])
+  @@index([classId, status])
+  @@index([userId, status])
+  @@index([status, attendedAt])
 }
+
+// STATUS: "PENDING" | "PAID" | "FAILED" | "REFUNDED"
+model Payment {
+  id       String @id @default(cuid())
+  status   String @default("PENDING")
+  amountCents Int
+  // Platform's cut, in the same currency.
+  feeCents    Int    @default(0)
+  currency    String @default("aud")
+
+  stripeCheckoutSessionId String?  @unique
+  stripePaymentIntentId   String?  @unique
+  stripeRefundId          String?
+
+  paidAt     DateTime?
+  refundedAt DateTime?
+  failureReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookingId String  @unique
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// Stripe webhook deduplication — Stripe may deliver the same event more than
+// once, and payment side effects must only run a single time.
+model ProcessedWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+}
+
+// ─── Gamification ────────────────────────────────────────────────────────────
 
 model GamificationProfile {
   id             String    @id @default(cuid())
@@ -94,8 +312,12 @@ model GamificationProfile {
   classesTaken   Int       @default(0)
   lastAttendedAt DateTime?
 
+  updatedAt DateTime @updatedAt
+
   userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([totalPoints])
 }
 
 model Badge {
@@ -114,10 +336,27 @@ model UserBadge {
   earnedAt DateTime @default(now())
 
   userId String
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   badgeId String
-  badge   Badge  @relation(fields: [badgeId], references: [id])
+  badge   Badge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeId])
+}
+
+// ─── Moderation ──────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  targetType String
+  targetId   String
+  detail     String?
+  createdAt  DateTime @default(now())
+
+  actorId String
+  actor   User   @relation("AuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }

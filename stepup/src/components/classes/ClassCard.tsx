@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { bookClassAction } from "@/lib/actions/class-actions";
-import { formatClassWhen, formatDuration } from "@/lib/format";
+import { formatClassWhen, formatDuration, formatMoney } from "@/lib/time";
 import { LEVEL_LABEL } from "@/lib/roles";
 import { Tag } from "@/components/ui/Pill";
-import { SubmitButton } from "@/components/ui/SubmitButton";
 import { Card } from "@/components/ui/Card";
+import { BookButton } from "@/components/classes/BookButton";
 
 export type ClassCardData = {
   id: string;
@@ -13,10 +12,13 @@ export type ClassCardData = {
   format: string;
   level: string;
   startTime: Date;
+  timezone: string;
   durationMin: number;
   points: number;
   capacity: number;
-  bookedCount: number;
+  seatsTaken: number;
+  priceCents: number;
+  currency: string;
   hostName: string;
   studioName: string | null;
   city: string | null;
@@ -24,12 +26,14 @@ export type ClassCardData = {
 
 export function ClassCard({
   data,
-  isBooked,
+  bookingStatus,
+  viewerTimezone,
 }: {
   data: ClassCardData;
-  isBooked: boolean;
+  bookingStatus?: string | null;
+  viewerTimezone: string;
 }) {
-  const spotsLeft = data.capacity - data.bookedCount;
+  const spotsLeft = data.capacity - data.seatsTaken;
   const isFull = spotsLeft <= 0;
 
   return (
@@ -40,7 +44,9 @@ export function ClassCard({
           <Tag tone={data.format === "ONLINE" ? "success" : "neutral"}>
             {data.format === "ONLINE" ? "Online" : "In person"}
           </Tag>
-          <Tag>{LEVEL_LABEL[data.level as keyof typeof LEVEL_LABEL] ?? data.level}</Tag>
+          <Tag>
+            {LEVEL_LABEL[data.level as keyof typeof LEVEL_LABEL] ?? data.level}
+          </Tag>
         </div>
         <Tag tone="gold">⚡ {data.points} pts</Tag>
       </div>
@@ -55,27 +61,39 @@ export function ClassCard({
 
       <div className="flex items-center justify-between text-sm text-ink-soft">
         <span>
-          {formatClassWhen(data.startTime)} · {formatDuration(data.durationMin)}
+          {/* Rendered in the viewer's own timezone, not the server's. */}
+          {formatClassWhen(data.startTime, viewerTimezone)} ·{" "}
+          {formatDuration(data.durationMin)}
         </span>
-        <span className={isFull ? "font-medium text-red-500" : ""}>
-          {isFull ? "Full" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`}
+        <span className="font-semibold text-ink">
+          {formatMoney(data.priceCents, data.currency)}
         </span>
       </div>
 
-      {isBooked ? (
+      <div className="flex items-center justify-between text-xs text-ink-soft">
+        <span className={isFull ? "font-medium text-red-500" : ""}>
+          {isFull ? "Full — waitlist open" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`}
+        </span>
+      </div>
+
+      {bookingStatus === "BOOKED" || bookingStatus === "ATTENDED" ? (
         <div className="rounded-full bg-success/10 py-2.5 text-center text-sm font-semibold text-success">
           Booked ✓
         </div>
+      ) : bookingStatus === "WAITLISTED" ? (
+        <div className="rounded-full bg-gold/15 py-2.5 text-center text-sm font-semibold text-gold">
+          On the waitlist
+        </div>
+      ) : bookingStatus === "PENDING_PAYMENT" ? (
+        <div className="rounded-full bg-surface-muted py-2.5 text-center text-sm font-semibold text-ink-soft">
+          Payment pending
+        </div>
       ) : (
-        <form action={bookClassAction.bind(null, data.id)}>
-          <SubmitButton
-            className="w-full"
-            disabled={isFull}
-            pendingLabel="Booking…"
-          >
-            {isFull ? "Full" : "Book"}
-          </SubmitButton>
-        </form>
+        <BookButton
+          classId={data.id}
+          isFull={isFull}
+          label={data.priceCents > 0 ? "Book & pay" : "Book"}
+        />
       )}
     </Card>
   );

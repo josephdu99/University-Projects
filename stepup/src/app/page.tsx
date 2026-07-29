@@ -72,10 +72,21 @@ export default async function Home() {
           </Card>
         </div>
 
-        <Link href="/login" className="mt-10 text-sm text-ink-soft underline">
-          View demo accounts
-        </Link>
       </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-sm text-ink-soft sm:px-6">
+          <p>© {new Date().getFullYear()} StepUp</p>
+          <div className="flex gap-4">
+            <Link href="/legal/terms" className="hover:text-ink">
+              Terms
+            </Link>
+            <Link href="/legal/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

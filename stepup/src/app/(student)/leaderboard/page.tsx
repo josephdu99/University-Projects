@@ -16,14 +16,17 @@ export default async function LeaderboardPage({
   const { period } = await searchParams;
   const isWeekly = period === "weekly";
 
-  const [global, weekly] = await Promise.all([
-    getGlobalLeaderboard(),
-    getWeeklyLeaderboard(),
-  ]);
-
   const rows = isWeekly
-    ? weekly.map((r) => ({ userId: r.userId, points: r.points, user: r.user }))
-    : global.map((r) => ({ userId: r.userId, points: r.totalPoints, user: r.user }));
+    ? (await getWeeklyLeaderboard()).map((r) => ({
+        userId: r.userId,
+        points: r.points,
+        user: r.user,
+      }))
+    : (await getGlobalLeaderboard()).map((r) => ({
+        userId: r.userId,
+        points: r.totalPoints,
+        user: r.user,
+      }));
 
   return (
     <div className="flex flex-col gap-5">
@@ -57,19 +60,29 @@ export default async function LeaderboardPage({
               <span className="w-7 text-center text-sm font-bold text-ink-soft">
                 {MEDALS[i] ?? i + 1}
               </span>
-              <Avatar emoji={row.user.avatarEmoji} color={row.user.avatarColor} size="sm" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-ink">
+              <Avatar
+                emoji={row.user.avatarEmoji}
+                color={row.user.avatarColor}
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-ink">
                   {row.user.name}
                   {row.userId === user.id && (
-                    <span className="ml-1.5 text-xs font-normal text-brand">(you)</span>
+                    <span className="ml-1.5 text-xs font-normal text-brand">
+                      (you)
+                    </span>
                   )}
                 </p>
                 {row.user.homeCity && (
-                  <p className="text-xs text-ink-soft">{row.user.homeCity}</p>
+                  <p className="truncate text-xs text-ink-soft">
+                    {row.user.homeCity}
+                  </p>
                 )}
               </div>
-              <span className="text-sm font-bold text-ink">{row.points.toLocaleString()} pts</span>
+              <span className="shrink-0 text-sm font-bold text-ink">
+                {row.points.toLocaleString()} pts
+              </span>
             </div>
           ))}
         </Card>

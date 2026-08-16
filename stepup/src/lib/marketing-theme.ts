@@ -1,8 +1,8 @@
 import { Sora, Work_Sans } from "next/font/google";
 
 /**
- * Typography and palette for the public marketing pages (landing + Get
- * Started). Scoped to those routes so the signed-in app keeps its own look.
+ * Typography and palette for the public marketing pages (landing, Get Started
+ * and login). Scoped to those routes so the signed-in app keeps its own look.
  *
  * Values come from the design handoff and are authored in OKLCH.
  */
@@ -46,8 +46,12 @@ export const C = {
   /** Eyebrow tag */
   tagBg: "oklch(94% 0.05 85)",
   tagInk: "oklch(38% 0.09 70)",
-  /** Amber highlight in the gamification band */
+  /** Amber highlight in the gamification band and login equaliser */
   gold: "oklch(78% 0.15 85)",
+  /** Text on the dark full-bleed panels */
+  onDark: "oklch(97% 0.01 70)",
+  onDarkSoft: "oklch(75% 0.015 70)",
+  onDarkBody: "oklch(80% 0.015 70)",
   /** Disabled control */
   disabledBg: "oklch(88% 0.01 70)",
   disabledInk: "oklch(60% 0.01 70)",

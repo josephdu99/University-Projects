@@ -1,34 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sora, Work_Sans } from "next/font/google";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { ROLE_HOME } from "@/lib/roles";
-
-// Scoped to this page so the in-app UI keeps its own typography.
-const sora = Sora({
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-display",
-});
-const workSans = Work_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-body",
-});
-
-const C = {
-  bg: "oklch(97.5% 0.012 70)",
-  bgAlt: "oklch(94% 0.015 70)",
-  card: "oklch(99% 0.005 70)",
-  ink: "oklch(22% 0.02 60)",
-  inkSoft: "oklch(45% 0.02 60)",
-  border: "oklch(90% 0.01 70)",
-  borderSoft: "oklch(88% 0.01 70)",
-  brand: "oklch(66% 0.19 35)",
-  onBrand: "oklch(99% 0.005 70)",
-  gold: "oklch(78% 0.15 85)",
-};
+import { C, DISPLAY, marketingFontClass } from "@/lib/marketing-theme";
+import { TESTIMONIALS } from "@/lib/marketing-content";
+import { PLATFORM_FEE_PERCENT } from "@/lib/stripe";
 
 const GAMIFICATION_FEATURES = [
   {
@@ -44,20 +21,6 @@ const GAMIFICATION_FEATURES = [
     desc: "See how your crew stacks up weekly, and challenge each other to keep moving.",
   },
 ];
-
-/**
- * Real testimonials only. The design mockup shipped with example quotes
- * attributed to invented people; publishing those would be presenting
- * fabricated reviews as genuine, so the section stays hidden until there are
- * real ones to show. Add entries here once you have permission to quote them.
- */
-const TESTIMONIALS: {
-  quote: string;
-  name: string;
-  role: string;
-  initial: string;
-  avatarBg: string;
-}[] = [];
 
 const STUDIO_SWATCHES = [
   ["oklch(90% 0.05 35)", "oklch(85% 0.05 35)"],
@@ -100,7 +63,7 @@ export default async function Home() {
 
   return (
     <div
-      className={`${sora.variable} ${workSans.variable}`}
+      className={marketingFontClass}
       style={{
         fontFamily: "var(--font-body), sans-serif",
         background: C.bg,
@@ -125,7 +88,7 @@ export default async function Home() {
       >
         <div
           style={{
-            fontFamily: "var(--font-display), sans-serif",
+            fontFamily: DISPLAY,
             fontWeight: 800,
             fontSize: 22,
             letterSpacing: "-0.02em",
@@ -193,7 +156,7 @@ export default async function Home() {
           </div>
           <h1
             style={{
-              fontFamily: "var(--font-display), sans-serif",
+              fontFamily: DISPLAY,
               fontWeight: 800,
               fontSize: "clamp(34px, 6vw, 56px)",
               lineHeight: 1.05,
@@ -309,7 +272,7 @@ export default async function Home() {
             </div>
             <h2
               style={{
-                fontFamily: "var(--font-display), sans-serif",
+                fontFamily: DISPLAY,
                 fontWeight: 800,
                 fontSize: "clamp(28px, 4.5vw, 40px)",
                 lineHeight: 1.1,
@@ -374,7 +337,7 @@ export default async function Home() {
         >
           <h2
             style={{
-              fontFamily: "var(--font-display), sans-serif",
+              fontFamily: DISPLAY,
               fontWeight: 800,
               fontSize: "clamp(26px, 4vw, 36px)",
               letterSpacing: "-0.02em",
@@ -416,7 +379,7 @@ export default async function Home() {
             </div>
             <h3
               style={{
-                fontFamily: "var(--font-display), sans-serif",
+                fontFamily: DISPLAY,
                 fontWeight: 800,
                 fontSize: "clamp(22px, 3vw, 28px)",
                 margin: "0 0 12px",
@@ -489,7 +452,7 @@ export default async function Home() {
             >
               <h2
                 style={{
-                  fontFamily: "var(--font-display), sans-serif",
+                  fontFamily: DISPLAY,
                   fontWeight: 800,
                   fontSize: "clamp(24px, 3.6vw, 32px)",
                   letterSpacing: "-0.02em",
@@ -577,7 +540,7 @@ export default async function Home() {
         >
           <h2
             style={{
-              fontFamily: "var(--font-display), sans-serif",
+              fontFamily: DISPLAY,
               fontWeight: 800,
               fontSize: "clamp(24px, 3.6vw, 32px)",
               letterSpacing: "-0.02em",
@@ -657,7 +620,7 @@ export default async function Home() {
         <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
           <h2
             style={{
-              fontFamily: "var(--font-display), sans-serif",
+              fontFamily: DISPLAY,
               fontWeight: 800,
               fontSize: "clamp(24px, 3.6vw, 32px)",
               letterSpacing: "-0.02em",
@@ -700,7 +663,7 @@ export default async function Home() {
               </div>
               <div
                 style={{
-                  fontFamily: "var(--font-display), sans-serif",
+                  fontFamily: DISPLAY,
                   fontWeight: 800,
                   fontSize: 36,
                   marginBottom: 6,
@@ -756,13 +719,15 @@ export default async function Home() {
               </div>
               <div
                 style={{
-                  fontFamily: "var(--font-display), sans-serif",
+                  fontFamily: DISPLAY,
                   fontWeight: 800,
                   fontSize: 36,
                   marginBottom: 6,
                 }}
               >
-                10%
+                {/* The mockup said 5%; this is the rate the app actually
+                    charges, so it tracks PLATFORM_FEE_PERCENT instead. */}
+                {PLATFORM_FEE_PERCENT}%
               </div>
               <div
                 style={{ fontSize: 14, color: C.inkSoft, marginBottom: 24 }}
@@ -802,7 +767,7 @@ export default async function Home() {
       >
         <h2
           style={{
-            fontFamily: "var(--font-display), sans-serif",
+            fontFamily: DISPLAY,
             fontWeight: 800,
             fontSize: "clamp(26px, 4vw, 36px)",
             letterSpacing: "-0.02em",
@@ -849,7 +814,7 @@ export default async function Home() {
       >
         <div
           style={{
-            fontFamily: "var(--font-display), sans-serif",
+            fontFamily: DISPLAY,
             fontWeight: 800,
           }}
         >
@@ -876,7 +841,7 @@ function Stat({ value, label }: { value: string; label: string }) {
     <div>
       <div
         style={{
-          fontFamily: "var(--font-display), sans-serif",
+          fontFamily: DISPLAY,
           fontWeight: 800,
           fontSize: 24,
         }}
@@ -900,7 +865,7 @@ function MiniStat({ value, label }: { value: string; label: string }) {
     >
       <div
         style={{
-          fontFamily: "var(--font-display), sans-serif",
+          fontFamily: DISPLAY,
           fontWeight: 800,
           fontSize: 22,
         }}
@@ -945,7 +910,7 @@ function AudienceCard({
       </div>
       <h3
         style={{
-          fontFamily: "var(--font-display), sans-serif",
+          fontFamily: DISPLAY,
           fontWeight: 700,
           fontSize: 22,
           margin: "0 0 10px",

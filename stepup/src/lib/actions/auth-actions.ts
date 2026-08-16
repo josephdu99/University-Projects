@@ -169,6 +169,14 @@ export async function loginAction(
   }
 }
 
+/**
+ * Kicks off the Google OAuth redirect. Only reachable when the login page
+ * renders the button, which it does only once credentials are configured.
+ */
+export async function googleLoginAction() {
+  await signIn("google", { redirectTo: "/" });
+}
+
 export async function logoutAction() {
   await signOut({ redirectTo: "/" });
 }

@@ -50,3 +50,40 @@ body {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ── Login panel animation ──────────────────────────────────────────────────
+   The equaliser bars and rotating line on /login. Declared here rather than
+   inline because keyframes can't live in a style attribute. */
+
+@keyframes stepup-bar-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes stepup-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Continuous bouncing is exactly the kind of motion that triggers vestibular
+   discomfort, so hold the bars still and drop the slide when asked to. */
+@media (prefers-reduced-motion: reduce) {
+  .stepup-eq-bar {
+    animation: none !important;
+    transform: scaleY(0.65) !important;
+  }
+  .stepup-rotating-line {
+    animation: none !important;
+  }
+}

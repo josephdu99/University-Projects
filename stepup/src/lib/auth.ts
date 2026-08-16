@@ -1,5 +1,7 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import type { Role } from "@/lib/roles";
@@ -17,11 +19,48 @@ class LoginError extends CredentialsSignin {
   }
 }
 
+/**
+ * "Continue with Google" only appears once credentials are configured. Without
+ * this guard the button would render and then fail at the redirect, which is
+ * worse than not offering it at all.
+ */
+export const GOOGLE_ENABLED = Boolean(
+  process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
+);
+
+/**
+ * Google sign-in creates a normal StepUp account on first use. Dancers are the
+ * default — studios and instructors need details Google can't supply, so they
+ * go through Get Started instead.
+ *
+ * `passwordHash` is required by the schema, so first-party accounts get random
+ * bytes that no password can ever hash to. The account is reachable by password
+ * only after its owner sets one through "Forgot password?".
+ */
+async function findOrCreateGoogleUser(email: string, name: string) {
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing) return existing;
+
+  return db.user.create({
+    data: {
+      email,
+      name,
+      passwordHash: `google-only:${randomBytes(32).toString("hex")}`,
+      role: "STUDENT",
+      // Google has already proven the address, so there is nothing to verify.
+      emailVerifiedAt: new Date(),
+      acceptedTermsAt: new Date(),
+      profile: { create: {} },
+    },
+  });
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   pages: { signIn: "/login", error: "/login" },
   trustHost: true,
   providers: [
+    ...(GOOGLE_ENABLED ? [Google] : []),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
@@ -76,8 +115,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt: async ({ token, user, trigger }) => {
-      if (user) {
+    signIn: async ({ account, profile }) => {
+      if (account?.provider !== "google") return true;
+
+      // Signing in with Google adopts any existing account on the same
+      // address, so an unverified Google address would be a way to take over
+      // somebody's password account. Google sets this flag itself.
+      if (profile?.email_verified !== true || !profile.email) {
+        logWarn("auth.googleUnverifiedEmail", { email: profile?.email });
+        return false;
+      }
+
+      const existing = await db.user.findUnique({
+        where: { email: profile.email.toLowerCase() },
+        select: { suspendedAt: true },
+      });
+      if (existing?.suspendedAt) return false;
+
+      return true;
+    },
+    jwt: async ({ token, user, account, trigger }) => {
+      // Google hands back a Google account id, not a StepUp one, so resolve
+      // the real user record before anything downstream reads token.id.
+      if (account?.provider === "google" && user?.email) {
+        const record = await findOrCreateGoogleUser(
+          user.email.toLowerCase(),
+          user.name?.trim() || user.email.split("@")[0]
+        );
+        token.id = record.id;
+        token.role = record.role as Role;
+        token.name = record.name;
+        token.avatarEmoji = record.avatarEmoji;
+        token.avatarColor = record.avatarColor;
+        token.timezone = record.timezone;
+        token.verified = record.emailVerifiedAt !== null;
+      } else if (user) {
         token.id = user.id as string;
         token.role = user.role as Role;
         token.avatarEmoji = user.avatarEmoji as string;

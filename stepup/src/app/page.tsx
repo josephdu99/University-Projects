@@ -6,21 +6,8 @@ import { ROLE_HOME } from "@/lib/roles";
 import { C, DISPLAY, marketingFontClass } from "@/lib/marketing-theme";
 import { TESTIMONIALS } from "@/lib/marketing-content";
 import { PLATFORM_FEE_PERCENT } from "@/lib/stripe";
-
-const GAMIFICATION_FEATURES = [
-  {
-    title: "Points for every class",
-    desc: "Book and attend to earn points — bonus points for trying new styles or studios.",
-  },
-  {
-    title: "Badges for milestones",
-    desc: "Unlock badges for streaks, style variety, and class counts as you go.",
-  },
-  {
-    title: "Leaderboards with friends",
-    desc: "See how your crew stacks up weekly, and challenge each other to keep moving.",
-  },
-];
+import { CountUp } from "@/components/marketing/CountUp";
+import { WeekActivityCard } from "@/components/marketing/WeekActivityCard";
 
 const STUDIO_SWATCHES = [
   ["oklch(90% 0.05 35)", "oklch(85% 0.05 35)"],
@@ -32,7 +19,7 @@ const STUDIO_SWATCHES = [
 export const metadata = {
   title: "StepUp — Book a class in one tap",
   description:
-    "Find dance classes nearby or online, earn points and badges for every session, and keep your streak alive.",
+    "Find dance classes nearby or online, and keep showing up — StepUp keeps score so you don't have to.",
 };
 
 export default async function Home() {
@@ -174,9 +161,8 @@ export default async function Home() {
               margin: "0 0 32px",
             }}
           >
-            Find dance classes nearby or online, earn points and badges for
-            every session, and keep your streak alive with friends cheering you
-            on.
+            Find dance classes nearby or online, and keep showing up — StepUp
+            keeps score so you don&apos;t have to.
           </p>
           <div
             style={{
@@ -217,8 +203,10 @@ export default async function Home() {
           </div>
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Stat value="1-tap" label="booking, no forms" />
+            {/* The comp counted up to a hard-coded 2,400+. This counts up to
+                however many classes there actually are. */}
             <Stat
-              value={classCount > 0 ? `${classCount}` : "New"}
+              value={classCount > 0 ? <CountUp to={classCount} /> : "New"}
               label={classCount > 0 ? "classes hosted" : "platform, growing fast"}
             />
             <Stat
@@ -233,7 +221,7 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* GAMIFICATION */}
+      {/* PROGRESS — shown, not named */}
       <div
         style={{
           background: C.ink,
@@ -252,24 +240,9 @@ export default async function Home() {
           }}
         >
           <div style={{ flex: "1 1 420px", minWidth: 280 }}>
-            <ProgressArt />
+            <WeekActivityCard />
           </div>
           <div style={{ flex: "1 1 460px", minWidth: 280 }}>
-            <div
-              style={{
-                display: "inline-block",
-                padding: "6px 14px",
-                borderRadius: 999,
-                background: "oklch(78% 0.15 85 / 0.2)",
-                color: C.gold,
-                fontWeight: 700,
-                fontSize: 13,
-                letterSpacing: "0.02em",
-                marginBottom: 20,
-              }}
-            >
-              GAMIFIED PROGRESS
-            </div>
             <h2
               style={{
                 fontFamily: DISPLAY,
@@ -280,46 +253,20 @@ export default async function Home() {
                 margin: "0 0 20px",
               }}
             >
-              Every class you take moves the needle.
+              Show up. Watch it add up.
             </h2>
             <p
               style={{
                 fontSize: 17,
-                color: "oklch(80% 0.015 70)",
+                color: C.onDarkBody,
                 maxWidth: 480,
-                margin: "0 0 32px",
+                margin: 0,
               }}
             >
-              Earn points for showing up, unlock badges for milestones, and see
-              how you stack up against your crew — all without lifting a finger
-              beyond booking your next class.
+              Every class you book quietly builds your streak and your standing
+              — no extra taps, no busywork. Just glance and see how your week is
+              going.
             </p>
-            {GAMIFICATION_FEATURES.map((feat) => (
-              <div
-                key={feat.title}
-                style={{ display: "flex", gap: 16, marginBottom: 22 }}
-              >
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: C.gold,
-                    flexShrink: 0,
-                  }}
-                />
-                <div>
-                  <div
-                    style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}
-                  >
-                    {feat.title}
-                  </div>
-                  <div style={{ fontSize: 14, color: "oklch(75% 0.015 70)" }}>
-                    {feat.desc}
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -677,8 +624,11 @@ export default async function Home() {
                 forever
               </div>
               <Feature>Unlimited class browsing &amp; booking</Feature>
-              <Feature>Points, badges &amp; leaderboards</Feature>
-              <Feature last>Streaks &amp; friend challenges</Feature>
+              <Feature>Weekly progress &amp; class rankings</Feature>
+              {/* The comp said "friend challenges". There is no friends
+                  feature — the weekly ranking is platform-wide — so this
+                  describes the streak, which does exist. */}
+              <Feature last>Streaks that reward showing up</Feature>
               <Link
                 href="/signup"
                 style={{
@@ -836,7 +786,13 @@ export default async function Home() {
 
 // ─── Small presentational pieces ─────────────────────────────────────────────
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({
+  value,
+  label,
+}: {
+  value: React.ReactNode;
+  label: string;
+}) {
   return (
     <div>
       <div
@@ -983,85 +939,6 @@ function HeroArt() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ProgressArt() {
-  const levels = [
-    { name: "Newcomer", pct: 100 },
-    { name: "Groove Getter", pct: 72 },
-    { name: "Rhythm Rider", pct: 34 },
-  ];
-
-  return (
-    <div
-      style={{
-        height: "clamp(280px, 45vw, 440px)",
-        borderRadius: 28,
-        background: "oklch(28% 0.025 60)",
-        border: "1px solid oklch(38% 0.02 60)",
-        padding: "clamp(22px, 3.5vw, 34px)",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        gap: 22,
-      }}
-    >
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {["🎉", "⭐", "🔥", "🌈", "🦋"].map((e) => (
-          <div
-            key={e}
-            style={{
-              width: 46,
-              height: 46,
-              borderRadius: 14,
-              background: "oklch(78% 0.15 85 / 0.18)",
-              border: "1px solid oklch(78% 0.15 85 / 0.35)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 22,
-            }}
-          >
-            {e}
-          </div>
-        ))}
-      </div>
-
-      {levels.map((l) => (
-        <div key={l.name}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 13,
-              color: "oklch(80% 0.015 70)",
-              marginBottom: 6,
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>{l.name}</span>
-            <span>{l.pct}%</span>
-          </div>
-          <div
-            style={{
-              height: 10,
-              borderRadius: 999,
-              background: "oklch(38% 0.02 60)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${l.pct}%`,
-                height: "100%",
-                borderRadius: 999,
-                background: `linear-gradient(90deg, ${C.brand}, ${C.gold})`,
-              }}
-            />
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

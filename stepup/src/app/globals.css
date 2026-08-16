@@ -51,9 +51,43 @@ body {
   }
 }
 
-/* ── Login panel animation ──────────────────────────────────────────────────
-   The equaliser bars and rotating line on /login. Declared here rather than
-   inline because keyframes can't live in a style attribute. */
+/* ── Marketing page animation ───────────────────────────────────────────────
+   The login equaliser and the landing page's week-activity card. Declared here
+   rather than inline because keyframes can't live in a style attribute. */
+
+@keyframes stepup-bar-fill {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes stepup-flame-pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes stepup-rank-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(78% 0.15 85 / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px oklch(78% 0.15 85 / 0);
+  }
+}
 
 @keyframes stepup-bar-bounce {
   0%,
@@ -76,14 +110,23 @@ body {
   }
 }
 
-/* Continuous bouncing is exactly the kind of motion that triggers vestibular
-   discomfort, so hold the bars still and drop the slide when asked to. */
+/* Continuous bouncing and pulsing are exactly the kind of motion that triggers
+   vestibular discomfort. Everything here settles into its finished state
+   instead of looping — the week card still reads correctly, it just doesn't
+   move. Count-ups check the same preference in JS and skip straight to the
+   final number. */
 @media (prefers-reduced-motion: reduce) {
   .stepup-eq-bar {
     animation: none !important;
     transform: scaleY(0.65) !important;
   }
-  .stepup-rotating-line {
+  .stepup-rotating-line,
+  .stepup-flame,
+  .stepup-rank-chip {
     animation: none !important;
+  }
+  .stepup-day-bar {
+    animation: none !important;
+    transform: scaleY(1) !important;
   }
 }

@@ -38,7 +38,9 @@ const COPY: Record<
     benefits: [
       "Unlimited class browsing & one-tap booking",
       "Points, badges & weekly leaderboards",
-      "Streaks & friend challenges",
+      // The comp said "friend challenges". There is no friends feature — the
+      // weekly leaderboard is platform-wide — so this describes the streak.
+      "Streaks that reward showing up",
       "Free forever — no credit card required",
     ],
     submitLabel: "Create free account",

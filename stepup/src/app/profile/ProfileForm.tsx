@@ -26,6 +26,7 @@ export function ProfileForm({
 }: {
   defaults: {
     name: string;
+    displayName: string;
     homeCity: string;
     bio: string;
     timezone: string;
@@ -60,6 +61,18 @@ export function ProfileForm({
             className={inputClass}
           />
         </label>
+
+        {showBio && (
+          <label className="flex flex-col gap-1 text-xs text-ink-soft">
+            Display name — what dancers see on your classes
+            <input
+              name="displayName"
+              defaultValue={defaults.displayName}
+              placeholder="e.g. Maya R. Dance"
+              className={inputClass}
+            />
+          </label>
+        )}
 
         <label className="flex flex-col gap-1 text-xs text-ink-soft">
           City

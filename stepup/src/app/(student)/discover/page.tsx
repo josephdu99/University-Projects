@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { ClassCard, type ClassCardData } from "@/components/classes/ClassCard";
+import { publicName } from "@/lib/roles";
 import { PillLink } from "@/components/ui/PillLink";
 import { VerifyBanner } from "@/components/VerifyBanner";
 
@@ -32,7 +33,7 @@ export default async function DiscoverPage({
       orderBy: { startTime: "asc" },
       take: 60,
       include: {
-        host: { select: { name: true } },
+        host: { select: { name: true, displayName: true } },
         studio: { select: { name: true, city: true } },
         _count: { select: { bookings: { where: { status: { in: SEAT_HOLDING } } } } },
       },
@@ -70,7 +71,7 @@ export default async function DiscoverPage({
     seatsTaken: c._count.bookings,
     priceCents: c.priceCents,
     currency: c.currency,
-    hostName: c.host.name,
+    hostName: publicName(c.host),
     studioName: c.studio?.name ?? null,
     city: c.studio?.city ?? null,
   }));

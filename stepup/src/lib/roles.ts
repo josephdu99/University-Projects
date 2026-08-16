@@ -48,3 +48,14 @@ export const BOOKING_STATUS = {
   CANCELLED: "CANCELLED",
   WAITLISTED: "WAITLISTED",
 } as const;
+
+/**
+ * The name dancers should see for a host. Independent instructors often teach
+ * under a brand ("Maya R. Dance") rather than their own name.
+ */
+export function publicName(user: {
+  name: string;
+  displayName?: string | null;
+}) {
+  return user.displayName?.trim() || user.name;
+}

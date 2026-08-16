@@ -7,6 +7,7 @@ import { formatClassWhen, formatDuration, formatMoney } from "@/lib/time";
 import { Tag } from "@/components/ui/Pill";
 import { Card } from "@/components/ui/Card";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { publicName } from "@/lib/roles";
 
 export default async function SchedulePage({
   searchParams,
@@ -23,7 +24,7 @@ export default async function SchedulePage({
       class: {
         include: {
           studio: { select: { name: true, address: true, city: true } },
-          host: { select: { name: true } },
+          host: { select: { name: true, displayName: true } },
         },
       },
       payment: { select: { status: true, amountCents: true, currency: true } },
@@ -85,7 +86,7 @@ export default async function SchedulePage({
                 {formatDuration(b.class.durationMin)}
                 {b.class.studio
                   ? ` · @ ${b.class.studio.name}`
-                  : ` · with ${b.class.host.name}`}
+                  : ` · with ${publicName(b.class.host)}`}
               </p>
               {b.status === "BOOKED" &&
                 b.class.format === "ONLINE" &&
@@ -127,7 +128,7 @@ export default async function SchedulePage({
                 {formatClassWhen(b.class.startTime, tz)}
                 {b.class.studio
                   ? ` · @ ${b.class.studio.name}`
-                  : ` · with ${b.class.host.name}`}
+                  : ` · with ${publicName(b.class.host)}`}
               </p>
             </div>
             {b.class.format === "ONLINE" ? (
@@ -153,7 +154,7 @@ export default async function SchedulePage({
                 {formatClassWhen(b.class.startTime, tz)}
                 {b.class.studio
                   ? ` · @ ${b.class.studio.name}`
-                  : ` · with ${b.class.host.name}`}
+                  : ` · with ${publicName(b.class.host)}`}
                 {b.payment?.status === "PAID" &&
                   ` · ${formatMoney(b.payment.amountCents, b.payment.currency)}`}
               </p>

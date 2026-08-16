@@ -9,7 +9,7 @@ import {
   formatDuration,
   formatMoney,
 } from "@/lib/time";
-import { LEVEL_LABEL } from "@/lib/roles";
+import { LEVEL_LABEL, publicName } from "@/lib/roles";
 import { Tag } from "@/components/ui/Pill";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
@@ -34,6 +34,7 @@ export default async function ClassDetailPage({
         select: {
           id: true,
           name: true,
+          displayName: true,
           bio: true,
           avatarEmoji: true,
           avatarColor: true,
@@ -107,12 +108,14 @@ export default async function ClassDetailPage({
           />
           <div>
             <p className="text-sm font-semibold text-ink">
-              {danceClass.studio ? danceClass.studio.name : danceClass.host.name}
+              {danceClass.studio
+                ? danceClass.studio.name
+                : publicName(danceClass.host)}
             </p>
             <p className="text-xs text-ink-soft">
               {danceClass.studio
                 ? `${danceClass.studio.address}, ${danceClass.studio.city}`
-                : `Hosted by ${danceClass.host.name}`}
+                : `Hosted by ${publicName(danceClass.host)}`}
             </p>
           </div>
         </div>

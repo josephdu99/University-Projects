@@ -91,6 +91,7 @@ export default async function ProfilePage() {
       <ProfileForm
         defaults={{
           name: user.name,
+          displayName: user.displayName ?? "",
           homeCity: user.homeCity ?? "",
           bio: user.bio ?? "",
           timezone: user.timezone,

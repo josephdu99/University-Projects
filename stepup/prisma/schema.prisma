@@ -21,6 +21,10 @@ model User {
   passwordHash String
   name         String
   role         String
+  // Public-facing name shown to dancers when it differs from the account
+  // holder's own name — e.g. an independent instructor trading as
+  // "Maya R. Dance". Falls back to `name` when unset.
+  displayName  String?
   bio          String?
   homeCity     String?
   // IANA zone (e.g. "Australia/Sydney"). Used to render times for this user.

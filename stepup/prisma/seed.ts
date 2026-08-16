@@ -109,6 +109,7 @@ async function main() {
   const jay = await mkUser("jay@stepup.dance", "Jay Okafor", "INSTRUCTOR", {
     homeCity: "Online",
     timezone: SYD,
+    displayName: "Jay Okafor Dance",
     bio: "Independent hip hop instructor streaming live sessions worldwide.",
     avatarEmoji: "🎤",
     avatarColor: "#1E90FF",
@@ -116,6 +117,7 @@ async function main() {
   const noor = await mkUser("noor@stepup.dance", "Noor Haddad", "INSTRUCTOR", {
     homeCity: "Online",
     timezone: MEL,
+    displayName: "Noor Haddad Movement",
     bio: "Contemporary & flow specialist teaching from her home studio.",
     avatarEmoji: "🌊",
     avatarColor: "#12B886",

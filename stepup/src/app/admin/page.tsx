@@ -11,6 +11,7 @@ import {
   unsuspendStudioAction,
 } from "@/lib/actions/admin-actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { publicName } from "@/lib/roles";
 
 export default async function AdminPage({
   searchParams,
@@ -70,7 +71,7 @@ export default async function AdminPage({
     db.danceClass.findMany({
       orderBy: { createdAt: "desc" },
       take: 8,
-      include: { host: { select: { name: true } } },
+      include: { host: { select: { name: true, displayName: true } } },
     }),
     db.auditLog.findMany({
       orderBy: { createdAt: "desc" },
@@ -190,7 +191,7 @@ export default async function AdminPage({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink">{c.title}</p>
                 <p className="truncate text-xs text-ink-soft">
-                  {c.host.name} · {formatClassWhen(c.startTime, c.timezone)}
+                  {publicName(c.host)} · {formatClassWhen(c.startTime, c.timezone)}
                 </p>
               </div>
               {c.cancelledAt && <Tag>Cancelled</Tag>}

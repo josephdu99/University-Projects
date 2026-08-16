@@ -46,9 +46,6 @@ const signUpSchema = z.object({
   timezone: z.string().optional(),
   homeCity: z.string().trim().max(60).optional(),
   bio: z.string().trim().max(280).optional(),
-  acceptTerms: z.literal("on", {
-    message: "You need to accept the Terms and Privacy Policy",
-  }),
   studioName: z.string().trim().max(80).optional(),
   studioCity: z.string().trim().max(60).optional(),
   studioAddress: z.string().trim().max(120).optional(),
@@ -72,6 +69,12 @@ export async function signUpAction(
     return { error: "Studio name, city and address are required." };
   }
 
+  // Independent instructors have no venue, but their public name is captured
+  // in the same field as a studio's on the signup form.
+  if (data.role === "INSTRUCTOR" && !data.studioName) {
+    return { error: "Add the name dancers will see on your classes." };
+  }
+
   const timezone =
     data.timezone && isValidTimeZone(data.timezone) ? data.timezone : DEFAULT_TIMEZONE;
 
@@ -91,6 +94,10 @@ export async function signUpAction(
       timezone,
       homeCity: data.homeCity || null,
       bio: data.bio || null,
+      // Independent instructors often teach under a brand rather than their
+      // own name; that's what dancers should see on a class.
+      displayName:
+        data.role === "INSTRUCTOR" && data.studioName ? data.studioName : null,
       avatarEmoji: pick(AVATAR_EMOJIS),
       avatarColor: pick(AVATAR_COLORS),
       acceptedTermsAt: new Date(),
@@ -282,6 +289,7 @@ export async function resetPasswordAction(
 
 const profileSchema = z.object({
   name: z.string().trim().min(2, "Name is too short").max(60),
+  displayName: z.string().trim().max(80).optional(),
   homeCity: z.string().trim().max(60).optional(),
   bio: z.string().trim().max(280).optional(),
   timezone: z.string().refine(isValidTimeZone, "Pick a valid timezone"),
@@ -306,6 +314,7 @@ export async function updateProfileAction(
     where: { id: user.id },
     data: {
       name: parsed.data.name,
+      displayName: parsed.data.displayName || null,
       homeCity: parsed.data.homeCity || null,
       bio: parsed.data.bio || null,
       timezone: parsed.data.timezone,

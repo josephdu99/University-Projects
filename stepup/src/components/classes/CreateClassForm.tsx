@@ -8,41 +8,61 @@ import { DANCE_LEVELS, LEVEL_LABEL } from "@/lib/roles";
 const inputClass =
   "rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none focus:border-brand";
 
+/** Everything "Run again" carries over from a past class. Date stays blank. */
+export type ClassDefaults = {
+  title: string;
+  style: string;
+  level: string;
+  description: string;
+  format: "IN_PERSON" | "ONLINE";
+  location: string;
+  onlineLink: string;
+  durationMin: number;
+  capacity: number;
+  points: number;
+  priceDollars: number;
+};
+
 export function CreateClassForm({
   fixedFormat,
   timezone,
   canCharge,
+  defaults,
 }: {
   fixedFormat?: "ONLINE";
   timezone: string;
   canCharge: boolean;
+  defaults?: ClassDefaults;
 }) {
   const [state, formAction] = useActionState(createClassAction, undefined);
   const [format, setFormat] = useState<"IN_PERSON" | "ONLINE">(
-    fixedFormat ?? "IN_PERSON"
+    fixedFormat ?? defaults?.format ?? "IN_PERSON"
   );
   const [repeats, setRepeats] = useState(false);
 
   return (
-    <details className="group rounded-2xl border border-border bg-surface open:pb-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 font-semibold text-ink">
-        <span>+ Create a class</span>
-        <span className="text-ink-soft transition-transform group-open:rotate-180">
-          ⌄
-        </span>
-      </summary>
-
-      <form action={formAction} className="flex flex-col gap-3 px-4">
-        <input name="title" required placeholder="Class title" className={inputClass} />
+      <form action={formAction} className="flex flex-col gap-3">
+        <input
+          name="title"
+          required
+          placeholder="Class title"
+          defaultValue={defaults?.title}
+          className={inputClass}
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <input
             name="style"
             required
             placeholder="Style (e.g. Salsa)"
+            defaultValue={defaults?.style}
             className={inputClass}
           />
-          <select name="level" defaultValue="ALL_LEVELS" className={inputClass}>
+          <select
+            name="level"
+            defaultValue={defaults?.level ?? "ALL_LEVELS"}
+            className={inputClass}
+          >
             {DANCE_LEVELS.map((l) => (
               <option key={l} value={l}>
                 {LEVEL_LABEL[l]}
@@ -56,6 +76,7 @@ export function CreateClassForm({
           required
           rows={2}
           placeholder="Short description"
+          defaultValue={defaults?.description}
           className={inputClass}
         />
 
@@ -89,6 +110,7 @@ export function CreateClassForm({
           <input
             name="location"
             placeholder="Location (optional — defaults to studio address)"
+            defaultValue={defaults?.location}
             className={inputClass}
           />
         ) : (
@@ -96,6 +118,7 @@ export function CreateClassForm({
             name="onlineLink"
             required
             placeholder="Online meeting link"
+            defaultValue={defaults?.onlineLink}
             className={inputClass}
           />
         )}
@@ -147,7 +170,7 @@ export function CreateClassForm({
             <input
               name="durationMin"
               type="number"
-              defaultValue={60}
+              defaultValue={defaults?.durationMin ?? 60}
               min={15}
               max={240}
               required
@@ -159,7 +182,7 @@ export function CreateClassForm({
             <input
               name="capacity"
               type="number"
-              defaultValue={20}
+              defaultValue={defaults?.capacity ?? 20}
               min={1}
               max={500}
               required
@@ -171,7 +194,7 @@ export function CreateClassForm({
             <input
               name="points"
               type="number"
-              defaultValue={25}
+              defaultValue={defaults?.points ?? 25}
               min={5}
               max={200}
               required
@@ -185,7 +208,7 @@ export function CreateClassForm({
           <input
             name="priceDollars"
             type="number"
-            defaultValue={0}
+            defaultValue={defaults?.priceDollars ?? 0}
             min={0}
             max={1000}
             step="0.01"
@@ -194,7 +217,7 @@ export function CreateClassForm({
           />
           {!canCharge && (
             <span className="text-[11px]">
-              Set up payouts above to charge for classes.
+              Set up payouts to charge for classes.
             </span>
           )}
         </label>
@@ -216,6 +239,5 @@ export function CreateClassForm({
           Publish class
         </SubmitButton>
       </form>
-    </details>
   );
 }

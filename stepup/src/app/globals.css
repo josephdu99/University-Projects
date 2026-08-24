@@ -79,6 +79,26 @@ body {
   }
 }
 
+/* Host dashboard: segment / fill-bar entrance, row hover, ghost pill hover. */
+
+@keyframes stepup-seg-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.stepup-row:hover {
+  background: oklch(97.8% 0.01 72);
+}
+
+.stepup-ghost-pill:hover {
+  border-color: oklch(66% 0.19 35);
+  color: oklch(58% 0.19 35);
+}
+
 @keyframes stepup-rank-pulse {
   0%,
   100% {
@@ -128,5 +148,14 @@ body {
   .stepup-day-bar {
     animation: none !important;
     transform: scaleY(1) !important;
+  }
+  /* Host dashboard: looping equalisers stop, entrance bars land finished. */
+  .stepup-host-eq {
+    animation: none !important;
+    transform: scaleY(0.7) !important;
+  }
+  .stepup-grow {
+    animation: none !important;
+    transform: scaleX(1) !important;
   }
 }

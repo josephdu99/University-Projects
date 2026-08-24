@@ -55,6 +55,34 @@ export const C = {
   /** Disabled control */
   disabledBg: "oklch(88% 0.01 70)",
   disabledInk: "oklch(60% 0.01 70)",
+
+  // ── Host dashboard additions ───────────────────────────────────────────────
+  /** Tinted surface behind the insight panel and date blocks */
+  tinted: "oklch(96.5% 0.014 75)",
+  dateTile: "oklch(96% 0.014 75)",
+  /** Hairline between list rows */
+  rowDivider: "oklch(93% 0.008 70)",
+  rowHover: "oklch(97.8% 0.01 72)",
+  /** Dashed border on empty states */
+  dashed: "oklch(86% 0.015 70)",
+  barTrack: "oklch(93% 0.01 70)",
+  barEmpty: "oklch(88% 0.02 70)",
+  /** Amber payouts nudge */
+  nudgeBg: "oklch(96% 0.035 85)",
+  nudgeBorder: "oklch(88% 0.06 85)",
+  nudgeInk: "oklch(40% 0.04 65)",
+  nudgeIcon: "oklch(45% 0.12 60)",
+  /** Inset chip on the dark hero */
+  darkChip: "oklch(35% 0.04 60)",
+  darkChipInk: "oklch(88% 0.05 85)",
+  darkBorder: "oklch(40% 0.02 60)",
+  darkEq: "oklch(88% 0.06 85)",
+  /** Nav + label greys */
+  navInactive: "oklch(48% 0.02 60)",
+  label: "oklch(52% 0.02 60)",
+  meta: "oklch(54% 0.02 60)",
+  /** "Nothing scheduled yet" */
+  warn: "oklch(58% 0.14 45)",
 } as const;
 
 export const CARD_SHADOW = "0 4px 24px oklch(0% 0 0 / 0.06)";

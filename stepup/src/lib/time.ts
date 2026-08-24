@@ -79,6 +79,18 @@ export function formatClassWhen(instant: Date, timeZone: string): string {
   return `${formatInTimeZone(instant, timeZone, "EEE d MMM")} · ${time}`;
 }
 
+/**
+ * The pieces a date block needs — month, day and time as separate strings,
+ * all resolved in the class's own zone rather than the viewer's.
+ */
+export function dateBlockParts(instant: Date, timeZone: string) {
+  return {
+    month: formatInTimeZone(instant, timeZone, "MMM").toUpperCase(),
+    day: formatInTimeZone(instant, timeZone, "d"),
+    time: formatInTimeZone(instant, timeZone, "h:mmaaa").toLowerCase(),
+  };
+}
+
 /** Full date + time + zone, for detail pages. */
 export function formatClassWhenLong(instant: Date, timeZone: string): string {
   return formatInTimeZone(instant, timeZone, "EEEE d MMMM yyyy 'at' h:mmaaa (zzz)");

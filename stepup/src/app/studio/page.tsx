@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
-import { Card } from "@/components/ui/Card";
-import { HostClassList } from "@/components/classes/HostClassList";
+import { HostDashboard } from "@/components/host/HostDashboard";
 import { VerifyBanner } from "@/components/VerifyBanner";
+
+export const metadata = { title: "Studio — StepUp" };
 
 export default async function StudioDashboardPage() {
   const user = await requireRole("STUDIO_OWNER");
@@ -13,28 +14,20 @@ export default async function StudioDashboardPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <VerifyBanner verified={user.verified} />
+    <>
+      <div style={{ marginBottom: 20 }}>
+        <VerifyBanner verified={user.verified} />
+      </div>
 
-      <Card className="flex flex-col gap-1 p-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-          {studio.emoji} Your studio
-        </p>
-        <h1 className="text-2xl font-extrabold text-ink">{studio.name}</h1>
-        <p className="text-sm text-ink-soft">
-          {studio.address}, {studio.city}
-        </p>
-        <p className="text-xs text-ink-soft">
-          Class times in {studio.timezone.replace(/_/g, " ")}
-        </p>
-      </Card>
-
-      <HostClassList
+      <HostDashboard
         hostId={user.id}
-        basePath="/studio"
+        base="/studio"
+        title={studio.name}
+        metaPrimary={`${studio.address}, ${studio.city}`}
         timezone={studio.timezone}
-        canCharge={Boolean(payout?.chargesEnabled)}
+        payoutsConnected={Boolean(payout?.chargesEnabled && payout?.payoutsEnabled)}
+        editHref="/profile"
       />
-    </div>
+    </>
   );
 }

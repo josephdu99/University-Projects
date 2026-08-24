@@ -15,8 +15,15 @@ import { EnergyPanel } from "./EnergyPanel";
 
 export const metadata = {
   title: "Log in — StepUp",
-  description: "Log in to book your next class and keep your streak going.",
+  description: "Log in to book your next dance class on StepUp.",
 };
+
+/**
+ * The seeded demo logins are useful while showing the app to someone and a
+ * liability on a public page otherwise, so they are off unless explicitly
+ * switched on. Set SHOW_DEMO_LOGINS=true to bring the panel back.
+ */
+const SHOW_DEMO_LOGINS = process.env.SHOW_DEMO_LOGINS === "true";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
@@ -29,12 +36,14 @@ export default async function LoginPage() {
   const [dancerCount, classCount, demoAccount] = await Promise.all([
     db.user.count({ where: { role: "STUDENT", suspendedAt: null } }),
     db.danceClass.count(),
-    // The seeded demo logins are only worth advertising while they exist;
-    // running prisma/reset-demo-data.ts removes this panel by itself.
-    db.user.findUnique({
-      where: { email: "alex@stepup.dance" },
-      select: { id: true },
-    }),
+    // Only looked up when the panel could actually render, and it still needs
+    // the seeded accounts to exist — reset-demo-data.ts removes it either way.
+    SHOW_DEMO_LOGINS
+      ? db.user.findUnique({
+          where: { email: "alex@stepup.dance" },
+          select: { id: true },
+        })
+      : null,
   ]);
 
   const stats = [

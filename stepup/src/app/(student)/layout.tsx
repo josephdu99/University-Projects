@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/session";
-import { AppShell } from "@/components/nav/AppShell";
+import { DancerShell } from "@/components/dancer/DancerShell";
 
 export default async function StudentLayout({
   children,
@@ -7,5 +7,5 @@ export default async function StudentLayout({
   children: React.ReactNode;
 }) {
   const user = await requireRole("STUDENT");
-  return <AppShell user={user}>{children}</AppShell>;
+  return <DancerShell user={{ name: user.name ?? "You" }}>{children}</DancerShell>;
 }

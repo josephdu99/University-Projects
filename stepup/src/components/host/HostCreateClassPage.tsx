@@ -23,7 +23,7 @@ export async function HostCreateClassPage({
   from,
 }: {
   hostId: string;
-  base: "/studio";
+  base: "/studio" | "/teach";
   timezone: string;
   canCharge: boolean;
   fixedFormat?: "ONLINE";
@@ -92,7 +92,6 @@ export async function HostCreateClassPage({
           timezone={timezone}
           canCharge={canCharge}
           defaults={defaults}
-          collapsible={false}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { ROLE_LABEL, type Role } from "@/lib/roles";
+import { ROLE_LABEL, isHost, type Role } from "@/lib/roles";
+import { PayoutPanel } from "@/components/PayoutPanel";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
@@ -17,15 +18,25 @@ import { VerifyBanner } from "@/components/VerifyBanner";
 export default async function ProfilePage() {
   const sessionUser = await requireUser();
 
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: sessionUser.id },
-    include: {
-      profile: true,
-      studio: true,
-      badges: { include: { badge: true } },
-      _count: { select: { hostedClasses: true } },
-    },
-  });
+  const [user, payout, earnings] = await Promise.all([
+    db.user.findUniqueOrThrow({
+      where: { id: sessionUser.id },
+      include: {
+        profile: true,
+        studio: true,
+        badges: { include: { badge: true } },
+        _count: { select: { hostedClasses: true } },
+      },
+    }),
+    db.payoutAccount.findUnique({ where: { userId: sessionUser.id } }),
+    db.payment.aggregate({
+      where: { status: "PAID", booking: { class: { hostId: sessionUser.id } } },
+      _sum: { amountCents: true, feeCents: true },
+    }),
+  ]);
+
+  const netEarningsCents =
+    (earnings._sum.amountCents ?? 0) - (earnings._sum.feeCents ?? 0);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
@@ -100,6 +111,17 @@ export default async function ProfilePage() {
         }}
         showBio={user.role === "INSTRUCTOR"}
       />
+
+      {/* The dashboard's payout nudge disappears once payouts are connected,
+          so earnings and the Stripe dashboard link live here instead. */}
+      {isHost(user.role as Role) && (
+        <PayoutPanel
+          status={payout?.status ?? null}
+          chargesEnabled={payout?.chargesEnabled ?? false}
+          payoutsEnabled={payout?.payoutsEnabled ?? false}
+          netEarningsCents={netEarningsCents}
+        />
+      )}
 
       {user.role === "STUDIO_OWNER" && user.studio && (
         <StudioForm

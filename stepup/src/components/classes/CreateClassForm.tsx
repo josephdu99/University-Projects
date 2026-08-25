@@ -28,18 +28,11 @@ export function CreateClassForm({
   timezone,
   canCharge,
   defaults,
-  collapsible = true,
 }: {
   fixedFormat?: "ONLINE";
   timezone: string;
   canCharge: boolean;
   defaults?: ClassDefaults;
-  /**
-   * The instructor dashboard still embeds this inline, where it needs to stay
-   * out of the way until asked for. The studio dashboard gives it a route of
-   * its own and renders it open.
-   */
-  collapsible?: boolean;
 }) {
   const [state, formAction] = useActionState(createClassAction, undefined);
   const [format, setFormat] = useState<"IN_PERSON" | "ONLINE">(
@@ -47,8 +40,8 @@ export function CreateClassForm({
   );
   const [repeats, setRepeats] = useState(false);
 
-  const form = (
-      <form action={formAction} className={collapsible ? "flex flex-col gap-3 px-4" : "flex flex-col gap-3"}>
+  return (
+      <form action={formAction} className="flex flex-col gap-3">
         <input
           name="title"
           required
@@ -246,19 +239,5 @@ export function CreateClassForm({
           Publish class
         </SubmitButton>
       </form>
-  );
-
-  if (!collapsible) return form;
-
-  return (
-    <details className="group rounded-2xl border border-border bg-surface open:pb-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 font-semibold text-ink">
-        <span>+ Create a class</span>
-        <span className="text-ink-soft transition-transform group-open:rotate-180">
-          ⌄
-        </span>
-      </summary>
-      {form}
-    </details>
   );
 }

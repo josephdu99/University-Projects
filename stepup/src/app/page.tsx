@@ -7,30 +7,28 @@ import { C, DISPLAY, marketingFontClass } from "@/lib/marketing-theme";
 import { TESTIMONIALS } from "@/lib/marketing-content";
 import { PLATFORM_FEE_PERCENT } from "@/lib/stripe";
 import { CountUp } from "@/components/marketing/CountUp";
+import { WeekActivityCard } from "@/components/marketing/WeekActivityCard";
 
-const SECTION_PAD = "clamp(56px, 9vw, 96px) clamp(20px, 5vw, 48px)";
-const SHELL = { maxWidth: 1280, margin: "0 auto" } as const;
-
-/** Warm-only, per the palette rule — no cool hues anywhere on this page. */
 const STUDIO_SWATCHES = [
   ["oklch(90% 0.05 35)", "oklch(85% 0.05 35)"],
-  ["oklch(90% 0.05 55)", "oklch(85% 0.05 55)"],
-  ["oklch(90% 0.05 85)", "oklch(85% 0.05 85)"],
-  ["oklch(90% 0.05 345)", "oklch(85% 0.05 345)"],
+  ["oklch(90% 0.04 200)", "oklch(85% 0.04 200)"],
+  ["oklch(90% 0.04 140)", "oklch(85% 0.04 140)"],
+  ["oklch(90% 0.04 300)", "oklch(85% 0.04 300)"],
 ];
 
 export const metadata = {
-  title: "StepUp — Book a class in one tap. Become a regular.",
+  title: "StepUp — Book a class in one tap",
   description:
-    "Find dance classes nearby or online, book your spot in one tap, and watch your own rhythm build week by week.",
+    "Find dance classes nearby or online, and keep showing up — StepUp keeps score so you don't have to.",
 };
 
 export default async function Home() {
   const user = await getSessionUser();
   if (user) redirect(ROLE_HOME[user.role]);
 
-  // Every figure on this page comes from a query. Nothing is hard-coded.
-  const [classCount, styleRows, studios] = await Promise.all([
+  // Headline figures come from the database rather than being hard-coded, so
+  // the page never overstates how much is actually on the platform.
+  const [classCount, styleRows, studios, upcomingCount] = await Promise.all([
     db.danceClass.count(),
     db.danceClass.findMany({ select: { style: true }, distinct: ["style"] }),
     db.studio.findMany({
@@ -42,6 +40,9 @@ export default async function Home() {
           select: { classes: { where: { startTime: { gte: new Date() } } } },
         },
       },
+    }),
+    db.danceClass.count({
+      where: { startTime: { gte: new Date() }, cancelledAt: null },
     }),
   ]);
 
@@ -57,8 +58,8 @@ export default async function Home() {
         lineHeight: 1.5,
       }}
     >
-      {/* ── NAV ──────────────────────────────────────────────────────────── */}
-      <header
+      {/* NAV */}
+      <div
         style={{
           position: "sticky",
           top: 0,
@@ -110,17 +111,18 @@ export default async function Home() {
             Get started
           </Link>
         </div>
-      </header>
+      </div>
 
-      {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section
+      {/* HERO */}
+      <div
         style={{
-          ...SHELL,
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
           gap: 56,
           padding: "clamp(48px, 8vw, 88px) clamp(20px, 5vw, 48px) clamp(56px, 9vw, 96px)",
+          maxWidth: 1280,
+          margin: "0 auto",
         }}
       >
         <div style={{ flex: "1 1 460px", minWidth: 280 }}>
@@ -129,8 +131,8 @@ export default async function Home() {
               display: "inline-block",
               padding: "6px 14px",
               borderRadius: 999,
-              background: C.tagBg,
-              color: C.tagInk,
+              background: "oklch(94% 0.05 85)",
+              color: "oklch(38% 0.09 70)",
               fontWeight: 700,
               fontSize: 13,
               letterSpacing: "0.02em",
@@ -149,7 +151,7 @@ export default async function Home() {
               margin: "0 0 24px",
             }}
           >
-            Book a class in one tap. Become a regular.
+            Book a class in one tap. Level up every time you show up.
           </h1>
           <p
             style={{
@@ -159,10 +161,17 @@ export default async function Home() {
               margin: "0 0 32px",
             }}
           >
-            Find dance classes nearby or online, book your spot in one tap, and
-            watch your own rhythm build week by week.
+            Find dance classes nearby or online, and keep showing up — StepUp
+            keeps score so you don&apos;t have to.
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 36 }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 14,
+              marginBottom: 36,
+            }}
+          >
             <Link
               href="/signup"
               style={{
@@ -175,10 +184,8 @@ export default async function Home() {
                 textDecoration: "none",
               }}
             >
-              Get started, it&apos;s free
+              Get started — it&apos;s free
             </Link>
-            {/* The comp's "See a demo class" has no feature behind it; browsing
-                the real catalogue is the honest equivalent. */}
             <Link
               href="/discover"
               style={{
@@ -194,31 +201,87 @@ export default async function Home() {
               Browse classes
             </Link>
           </div>
-
-          {/* The comp's third stat was a 4.9-star rating. Nothing in the app
-              collects ratings, so a real count of styles takes that slot. */}
           <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
             <Stat value="1-tap" label="booking, no forms" />
-            {classCount > 0 && (
-              <Stat value={<CountUp to={classCount} />} label="classes hosted" />
-            )}
-            {styleCount > 0 && (
-              <Stat
-                value={`${styleCount}`}
-                label={styleCount === 1 ? "dance style" : "dance styles"}
-              />
-            )}
+            {/* The comp counted up to a hard-coded 2,400+. This counts up to
+                however many classes there actually are. */}
+            <Stat
+              value={classCount > 0 ? <CountUp to={classCount} /> : "New"}
+              label={classCount > 0 ? "classes hosted" : "platform, growing fast"}
+            />
+            <Stat
+              value={styleCount > 0 ? `${styleCount}` : "All"}
+              label={styleCount > 0 ? "dance styles" : "styles welcome"}
+            />
           </div>
         </div>
 
         <div style={{ flex: "1 1 420px", minWidth: 280 }}>
           <HeroArt />
         </div>
-      </section>
+      </div>
 
-      {/* ── AUDIENCES ────────────────────────────────────────────────────── */}
-      <section style={{ ...SHELL, padding: SECTION_PAD }}>
-        <div style={{ textAlign: "center", maxWidth: 600, margin: "0 auto 56px" }}>
+      {/* PROGRESS — shown, not named */}
+      <div
+        style={{
+          background: C.ink,
+          color: "oklch(97% 0.01 70)",
+          padding: "clamp(56px, 9vw, 96px) clamp(20px, 5vw, 48px)",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1280,
+            margin: "0 auto",
+            display: "flex",
+            flexWrap: "wrap-reverse",
+            gap: 56,
+            alignItems: "center",
+          }}
+        >
+          <div style={{ flex: "1 1 420px", minWidth: 280 }}>
+            <WeekActivityCard />
+          </div>
+          <div style={{ flex: "1 1 460px", minWidth: 280 }}>
+            <h2
+              style={{
+                fontFamily: DISPLAY,
+                fontWeight: 800,
+                fontSize: "clamp(28px, 4.5vw, 40px)",
+                lineHeight: 1.1,
+                letterSpacing: "-0.02em",
+                margin: "0 0 20px",
+              }}
+            >
+              Show up. Watch it add up.
+            </h2>
+            <p
+              style={{
+                fontSize: 17,
+                color: C.onDarkBody,
+                maxWidth: 480,
+                margin: 0,
+              }}
+            >
+              Every class you book quietly builds your streak and your standing
+              — no extra taps, no busywork. Just glance and see how your week is
+              going.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* AUDIENCES */}
+      <div
+        style={{
+          padding: "clamp(56px, 9vw, 96px) clamp(20px, 5vw, 48px)",
+          maxWidth: 1280,
+          margin: "0 auto",
+        }}
+      >
+        <div
+          style={{ textAlign: "center", maxWidth: 600, margin: "0 auto 56px" }}
+        >
           <h2
             style={{
               fontFamily: DISPLAY,
@@ -231,8 +294,8 @@ export default async function Home() {
             Built around the dance floor
           </h2>
           <p style={{ fontSize: 17, color: C.inkSoft, margin: 0 }}>
-            Whether you&apos;re dancing, teaching, or running the studio, StepUp
-            keeps everyone moving.
+            Whether you&apos;re dancing, teaching, or running the studio —
+            StepUp keeps everyone moving.
           </p>
         </div>
 
@@ -269,12 +332,19 @@ export default async function Home() {
                 margin: "0 0 12px",
               }}
             >
-              Discover, book, and find your people.
+              Discover, book, and never lose your streak.
             </h3>
-            <p style={{ fontSize: 16, opacity: 0.92, maxWidth: 460, margin: 0 }}>
+            <p
+              style={{
+                fontSize: 16,
+                opacity: 0.92,
+                maxWidth: 460,
+                margin: 0,
+              }}
+            >
               Browse classes at local studios or live online with independent
-              instructors. One tap books your spot, no back-and-forth, no waiting
-              on confirmation.
+              instructors. One tap books your spot — no back-and-forth, no
+              waiting on confirmation.
             </p>
           </div>
           <div
@@ -288,7 +358,7 @@ export default async function Home() {
           >
             <MiniStat
               value={styleCount > 0 ? `${styleCount}` : "—"}
-              label={styleCount === 1 ? "class style" : "class styles"}
+              label="class styles"
             />
             <MiniStat value="1 tap" label="to book" />
           </div>
@@ -298,7 +368,7 @@ export default async function Home() {
           <AudienceCard
             eyebrow="FOR STUDIOS"
             title="Fill your rosters, check in with a tap."
-            body="List your classes, manage capacity, and check students in at the door, no clipboard required."
+            body="List your classes, manage capacity, and check students in at the door — no clipboard required."
           />
           <AudienceCard
             eyebrow="FOR INDEPENDENT INSTRUCTORS"
@@ -306,12 +376,17 @@ export default async function Home() {
             body="Host online classes, set your own schedule, and grow a roster of regulars who follow you class after class."
           />
         </div>
-      </section>
+      </div>
 
-      {/* ── STUDIO SHOWCASE — real studios only ──────────────────────────── */}
+      {/* STUDIO SHOWCASE — real studios only */}
       {studios.length > 0 && (
-        <section style={{ background: C.bgAlt, padding: SECTION_PAD }}>
-          <div style={SHELL}>
+        <div
+          style={{
+            background: C.bgAlt,
+            padding: "clamp(56px, 9vw, 96px) clamp(20px, 5vw, 48px)",
+          }}
+        >
+          <div style={{ maxWidth: 1280, margin: "0 auto" }}>
             <div
               style={{
                 display: "flex",
@@ -335,7 +410,12 @@ export default async function Home() {
               </h2>
               <Link
                 href="/discover"
-                style={{ fontWeight: 700, fontSize: 15, color: C.brand, textDecoration: "none" }}
+                style={{
+                  fontWeight: 700,
+                  fontSize: 15,
+                  color: C.brand,
+                  textDecoration: "none",
+                }}
               >
                 Browse all classes →
               </Link>
@@ -360,16 +440,26 @@ export default async function Home() {
                       border: `1px solid ${C.borderSoft}`,
                     }}
                   >
-                    {/* Stand-in until there is real studio photography. */}
                     <div
-                      aria-hidden
                       style={{
                         height: 150,
                         background: `repeating-linear-gradient(45deg, ${a}, ${a} 10px, ${b} 10px, ${b} 20px)`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 40,
                       }}
-                    />
+                    >
+                      {studio.emoji}
+                    </div>
                     <div style={{ padding: 18 }}>
-                      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 16,
+                          marginBottom: 4,
+                        }}
+                      >
                         {studio.name}
                       </div>
                       <div style={{ fontSize: 13, color: C.inkSoft }}>
@@ -383,12 +473,18 @@ export default async function Home() {
               })}
             </div>
           </div>
-        </section>
+        </div>
       )}
 
-      {/* ── TESTIMONIALS — hidden until real quotes exist ────────────────── */}
+      {/* TESTIMONIALS — hidden until real quotes exist */}
       {TESTIMONIALS.length > 0 && (
-        <section style={{ ...SHELL, padding: SECTION_PAD }}>
+        <div
+          style={{
+            padding: "clamp(56px, 9vw, 96px) clamp(20px, 5vw, 48px)",
+            maxWidth: 1280,
+            margin: "0 auto",
+          }}
+        >
           <h2
             style={{
               fontFamily: DISPLAY,
@@ -418,10 +514,18 @@ export default async function Home() {
                   padding: 28,
                 }}
               >
-                <p style={{ fontSize: 16, margin: "0 0 20px", color: "oklch(28% 0.02 60)" }}>
+                <p
+                  style={{
+                    fontSize: 16,
+                    margin: "0 0 20px",
+                    color: "oklch(28% 0.02 60)",
+                  }}
+                >
                   &ldquo;{t.quote}&rdquo;
                 </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 12 }}
+                >
                   <div
                     style={{
                       width: 36,
@@ -439,18 +543,27 @@ export default async function Home() {
                     {t.initial}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{t.name}</div>
-                    <div style={{ fontSize: 13, color: C.inkSoft }}>{t.role}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      {t.name}
+                    </div>
+                    <div style={{ fontSize: 13, color: C.inkSoft }}>
+                      {t.role}
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
 
-      {/* ── PRICING ──────────────────────────────────────────────────────── */}
-      <section style={{ background: C.bgAlt, padding: SECTION_PAD }}>
+      {/* PRICING */}
+      <div
+        style={{
+          background: C.bgAlt,
+          padding: "clamp(56px, 9vw, 96px) clamp(20px, 5vw, 48px)",
+        }}
+      >
         <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
           <h2
             style={{
@@ -467,7 +580,14 @@ export default async function Home() {
             Free to dance. Studios and instructors keep more of what they earn.
           </p>
 
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", textAlign: "left" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 24,
+              flexWrap: "wrap",
+              textAlign: "left",
+            }}
+          >
             <div
               style={{
                 flex: "1 1 320px",
@@ -478,7 +598,14 @@ export default async function Home() {
                 border: `2px solid ${C.brand}`,
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: 14, color: C.brand, marginBottom: 8 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: C.brand,
+                  marginBottom: 8,
+                }}
+              >
                 DANCERS
               </div>
               <div
@@ -491,12 +618,17 @@ export default async function Home() {
               >
                 Free
               </div>
-              <div style={{ fontSize: 14, color: C.inkSoft, marginBottom: 24 }}>forever</div>
+              <div
+                style={{ fontSize: 14, color: C.inkSoft, marginBottom: 24 }}
+              >
+                forever
+              </div>
               <Feature>Unlimited class browsing &amp; booking</Feature>
-              <Feature>See your progress, week by week</Feature>
-              {/* The comp listed "Group bookings & friend invites"; neither
-                  exists — a dancer books one seat at a time. */}
-              <Feature last>Studios near you and classes live online</Feature>
+              <Feature>Weekly progress &amp; class rankings</Feature>
+              {/* The comp said "friend challenges". There is no friends
+                  feature — the weekly ranking is platform-wide — so this
+                  describes the streak, which does exist. */}
+              <Feature last>Streaks that reward showing up</Feature>
               <Link
                 href="/signup"
                 style={{
@@ -525,7 +657,14 @@ export default async function Home() {
                 border: `1px solid ${C.borderSoft}`,
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: 14, color: C.inkSoft, marginBottom: 8 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: C.inkSoft,
+                  marginBottom: 8,
+                }}
+              >
                 STUDIOS &amp; INSTRUCTORS
               </div>
               <div
@@ -536,10 +675,13 @@ export default async function Home() {
                   marginBottom: 6,
                 }}
               >
-                {/* The comp said 5%. This is the rate the app actually charges. */}
+                {/* The mockup said 5%; this is the rate the app actually
+                    charges, so it tracks PLATFORM_FEE_PERCENT instead. */}
                 {PLATFORM_FEE_PERCENT}%
               </div>
-              <div style={{ fontSize: 14, color: C.inkSoft, marginBottom: 24 }}>
+              <div
+                style={{ fontSize: 14, color: C.inkSoft, marginBottom: 24 }}
+              >
                 per booking, no monthly fee
               </div>
               <Feature>Roster &amp; scheduling tools</Feature>
@@ -564,10 +706,15 @@ export default async function Home() {
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* ── FOOTER CTA ───────────────────────────────────────────────────── */}
-      <section style={{ padding: SECTION_PAD, textAlign: "center" }}>
+      {/* FOOTER CTA */}
+      <div
+        style={{
+          padding: "clamp(56px, 9vw, 96px) clamp(20px, 5vw, 48px)",
+          textAlign: "center",
+        }}
+      >
         <h2
           style={{
             fontFamily: DISPLAY,
@@ -579,6 +726,12 @@ export default async function Home() {
         >
           Your next class is one tap away.
         </h2>
+        {upcomingCount > 0 && (
+          <p style={{ fontSize: 16, color: C.inkSoft, margin: "0 0 8px" }}>
+            {upcomingCount} class{upcomingCount === 1 ? "" : "es"} coming up
+            right now.
+          </p>
+        )}
         <Link
           href="/signup"
           style={{
@@ -593,11 +746,11 @@ export default async function Home() {
             textDecoration: "none",
           }}
         >
-          Get started, it&apos;s free
+          Get started — it&apos;s free
         </Link>
-      </section>
+      </div>
 
-      <footer
+      <div
         style={{
           borderTop: `1px solid ${C.border}`,
           padding: "32px clamp(20px, 5vw, 48px)",
@@ -609,7 +762,14 @@ export default async function Home() {
           fontSize: 13,
         }}
       >
-        <div style={{ fontFamily: DISPLAY, fontWeight: 800 }}>StepUp</div>
+        <div
+          style={{
+            fontFamily: DISPLAY,
+            fontWeight: 800,
+          }}
+        >
+          StepUp
+        </div>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           <Link href="/legal/terms" style={{ color: "inherit", textDecoration: "none" }}>
             Terms
@@ -617,19 +777,33 @@ export default async function Home() {
           <Link href="/legal/privacy" style={{ color: "inherit", textDecoration: "none" }}>
             Privacy
           </Link>
-          <span>© {new Date().getFullYear()} StepUp. Dance more. Dance together.</span>
+          <span>© {new Date().getFullYear()} StepUp. Dance more, level up.</span>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }
 
-// ─── Pieces ──────────────────────────────────────────────────────────────────
+// ─── Small presentational pieces ─────────────────────────────────────────────
 
-function Stat({ value, label }: { value: React.ReactNode; label: string }) {
+function Stat({
+  value,
+  label,
+}: {
+  value: React.ReactNode;
+  label: string;
+}) {
   return (
     <div>
-      <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 24 }}>{value}</div>
+      <div
+        style={{
+          fontFamily: DISPLAY,
+          fontWeight: 800,
+          fontSize: 24,
+        }}
+      >
+        {value}
+      </div>
       <div style={{ fontSize: 13, color: C.inkSoft }}>{label}</div>
     </div>
   );
@@ -645,7 +819,15 @@ function MiniStat({ value, label }: { value: string; label: string }) {
         flex: "1 1 140px",
       }}
     >
-      <div style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 22 }}>{value}</div>
+      <div
+        style={{
+          fontFamily: DISPLAY,
+          fontWeight: 800,
+          fontSize: 22,
+        }}
+      >
+        {value}
+      </div>
       <div style={{ fontSize: 13, opacity: 0.85 }}>{label}</div>
     </div>
   );
@@ -697,82 +879,65 @@ function AudienceCard({
   );
 }
 
-function Feature({ children, last }: { children: React.ReactNode; last?: boolean }) {
+function Feature({
+  children,
+  last,
+}: {
+  children: React.ReactNode;
+  last?: boolean;
+}) {
   return (
-    <div style={{ fontSize: 15, marginBottom: last ? 24 : 8, display: "flex", gap: 8 }}>
-      <CheckIcon />
-      <span>{children}</span>
+    <div style={{ fontSize: 15, marginBottom: last ? 24 : 8 }}>
+      ✓ {children}
     </div>
   );
 }
 
-/** Line icon rather than a tick emoji — this page carries no emoji at all. */
-function CheckIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-      style={{ flex: "none", marginTop: 3 }}
-    >
-      <path
-        d="M4.5 12.5l5 5 10-11"
-        stroke={C.brand}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 /**
- * Stand-in for the hero photograph. The handoff asks for real studio
- * photography; until there is some, this is deliberately an illustration
- * rather than stock, so nothing here pretends to be a real class.
+ * Stand-in artwork for the design's photo slots. Rendered rather than left as
+ * an empty box so the page looks finished until real photography is supplied.
  */
 function HeroArt() {
   return (
     <div
-      aria-hidden
       style={{
         height: "clamp(280px, 45vw, 440px)",
         borderRadius: 28,
         background:
-          "linear-gradient(140deg, oklch(92% 0.06 75), oklch(78% 0.13 45) 48%, oklch(58% 0.15 30))",
+          "linear-gradient(140deg, oklch(88% 0.09 45), oklch(72% 0.16 35) 45%, oklch(52% 0.13 25))",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         position: "relative",
         overflow: "hidden",
       }}
     >
+      <div style={{ fontSize: "clamp(70px, 13vw, 140px)", lineHeight: 1 }}>
+        💃
+      </div>
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          bottom: 22,
+          left: 22,
+          right: 22,
+          background: "oklch(99% 0.005 70 / 0.92)",
+          borderRadius: 16,
+          padding: "14px 18px",
           display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "center",
-          gap: 10,
-          padding: 48,
-          opacity: 0.35,
+          alignItems: "center",
+          gap: 12,
         }}
       >
-        {[52, 96, 34, 120, 68, 140, 44, 104, 60, 84].map((h, i) => (
-          <div
-            key={i}
-            className="stepup-host-eq"
-            style={{
-              flex: 1,
-              maxWidth: 14,
-              height: h,
-              borderRadius: 7,
-              background: "oklch(99% 0.005 70)",
-              transformOrigin: "bottom",
-              animation: `stepup-bar-bounce ${1.2 + (i % 5) * 0.2}s ease-in-out ${i * 0.08}s infinite`,
-            }}
-          />
-        ))}
+        <div style={{ fontSize: 26 }}>🔥</div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>
+            6-week streak
+          </div>
+          <div style={{ fontSize: 13, color: C.inkSoft }}>
+            Keep it alive — book your next class
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ export async function HostClassesPage({
   base,
 }: {
   hostId: string;
-  base: "/studio";
+  base: "/studio" | "/teach";
 }) {
   const { upcoming, past, hostedCount } = await getHostDashboard(hostId);
 

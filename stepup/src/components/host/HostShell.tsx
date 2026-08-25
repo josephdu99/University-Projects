@@ -5,27 +5,30 @@ import { C, DISPLAY, marketingFontClass } from "@/lib/marketing-theme";
 import { initialsOf } from "@/lib/style-chips";
 import { HostNavLink } from "./HostNavLink";
 
-const NAV = [
-  { href: "/studio", label: "Studio" },
-  { href: "/studio/classes", label: "Classes" },
-  { href: "/studio/dancers", label: "Dancers" },
-  { href: "/profile", label: "Profile" },
-];
-
 /**
- * Shell for the studio owner's pages.
+ * Shell for the studio / instructor side of the app.
  *
- * Deliberately not the dancer AppShell: /studio follows the marketing design
- * system (Sora + Work Sans, warm palette, initials avatar) while the rest of
- * the app — including the instructor dashboard — still uses the in-app theme.
+ * Deliberately not the dancer AppShell: the host pages now follow the
+ * marketing design system (Sora + Work Sans, warm palette, initials avatars)
+ * while the dancer app still uses the older in-app theme.
  */
 export function HostShell({
+  base,
   user,
   children,
 }: {
-  user: { name: string };
+  /** "/studio" or "/teach" — the same nav serves both host types. */
+  base: "/studio" | "/teach";
+  user: { name: string; role: string };
   children: ReactNode;
 }) {
+  const items = [
+    { href: base, label: base === "/studio" ? "Studio" : "Teaching" },
+    { href: `${base}/classes`, label: "Classes" },
+    { href: `${base}/dancers`, label: "Dancers" },
+    { href: "/profile", label: "Profile" },
+  ];
+
   return (
     <div
       className={marketingFontClass}
@@ -85,7 +88,7 @@ export function HostShell({
               fontWeight: 600,
             }}
           >
-            {NAV.map((item) => (
+            {items.map((item) => (
               <HostNavLink key={item.href} href={item.href} label={item.label} />
             ))}
           </nav>

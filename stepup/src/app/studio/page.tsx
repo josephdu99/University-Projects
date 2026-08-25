@@ -21,12 +21,10 @@ export default async function StudioDashboardPage() {
 
       <HostDashboard
         hostId={user.id}
-        base="/studio"
         title={studio.name}
-        metaPrimary={`${studio.address}, ${studio.city}`}
+        addressLine={`${studio.address}, ${studio.city}`}
         timezone={studio.timezone}
         payoutsConnected={Boolean(payout?.chargesEnabled && payout?.payoutsEnabled)}
-        editHref="/profile"
       />
     </>
   );

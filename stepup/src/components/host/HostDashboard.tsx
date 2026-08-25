@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { C, DISPLAY } from "@/lib/marketing-theme";
 import { getHostDashboard } from "@/lib/host-data";
-import { startPayoutOnboardingAction } from "@/lib/actions/payout-actions";
+import {
+  startPayoutOnboardingAction,
+  openPayoutDashboardAction,
+} from "@/lib/actions/payout-actions";
 import { HostEqualizer } from "./HostEqualizer";
 import { ClassRowList } from "./ClassRow";
 import { AvatarStack, describeFaces } from "./AvatarStack";
@@ -11,27 +14,25 @@ const PAST_ON_DASHBOARD = 6;
 /** Progress row in the "classes hosted" card caps out here. */
 const SEGMENTS = 8;
 
+const BASE = "/studio";
+const NEW_CLASS = `${BASE}/classes/new`;
+
 export async function HostDashboard({
   hostId,
-  base,
   title,
-  metaPrimary,
+  addressLine,
   timezone,
   payoutsConnected,
-  editHref,
 }: {
   hostId: string;
-  base: "/studio" | "/teach";
-  /** Studio name, or the instructor's public trading name. */
+  /** The studio's name. */
   title: string;
-  /** Street address for a studio; a one-liner for an instructor. */
-  metaPrimary: string;
+  /** Street address, shown before the timezone in the hero meta row. */
+  addressLine: string;
   timezone: string;
   payoutsConnected: boolean;
-  editHref: string;
 }) {
   const d = await getHostDashboard(hostId);
-  const newClassHref = `${base}/classes/new`;
 
   return (
     <>
@@ -68,7 +69,7 @@ export async function HostDashboard({
               marginBottom: 16,
             }}
           >
-            {base === "/studio" ? "YOUR STUDIO" : "YOUR TEACHING"}
+            YOUR STUDIO
           </div>
           <h1
             style={{
@@ -92,7 +93,7 @@ export async function HostDashboard({
               color: "oklch(78% 0.015 70)",
             }}
           >
-            <span>{metaPrimary}</span>
+            <span>{addressLine}</span>
             <span
               aria-hidden
               style={{
@@ -118,7 +119,7 @@ export async function HostDashboard({
           }}
         >
           <Link
-            href={newClassHref}
+            href={NEW_CLASS}
             style={{
               fontWeight: 700,
               fontSize: 15,
@@ -132,7 +133,7 @@ export async function HostDashboard({
             Create a class
           </Link>
           <Link
-            href={editHref}
+            href="/profile"
             style={{
               fontWeight: 600,
               fontSize: 15,
@@ -144,8 +145,31 @@ export async function HostDashboard({
               textDecoration: "none",
             }}
           >
-            {base === "/studio" ? "Edit studio" : "Edit profile"}
+            Edit studio
           </Link>
+          {/* The amber nudge below is the only other route to Stripe, and it
+              disappears on connect — so once connected the link lives here
+              instead of vanishing with it. */}
+          {payoutsConnected && (
+            <form action={openPayoutDashboardAction}>
+              <button
+                type="submit"
+                style={{
+                  fontWeight: 600,
+                  fontSize: 15,
+                  padding: "14px 24px",
+                  borderRadius: 999,
+                  border: `1.5px solid ${C.darkBorder}`,
+                  background: C.ink,
+                  color: "oklch(92% 0.01 70)",
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                }}
+              >
+                Payouts
+              </button>
+            </form>
+          )}
         </div>
       </section>
 
@@ -158,7 +182,15 @@ export async function HostDashboard({
           marginBottom: 20,
         }}
       >
-        <StatCard label="Upcoming" value={d.upcoming.length} qualifier="classes on the calendar">
+        <StatCard
+          label="Upcoming"
+          value={d.upcoming.length}
+          qualifier={
+            d.upcoming.length === 1
+              ? "class on the calendar"
+              : "classes on the calendar"
+          }
+        >
           {d.upcoming.length === 0 ? (
             <div style={{ fontSize: 13.5, color: C.warn, fontWeight: 600 }}>
               Nothing scheduled yet
@@ -189,7 +221,11 @@ export async function HostDashboard({
           </div>
         </StatCard>
 
-        <StatCard label="Check-ins" value={d.checkInCount} qualifier="dancers showed up">
+        <StatCard
+          label="Check-ins"
+          value={d.checkInCount}
+          qualifier={d.checkInCount === 1 ? "dancer showed up" : "dancers showed up"}
+        >
           {d.checkInFaces.length > 0 ? (
             <div style={{ display: "flex", alignItems: "center" }}>
               <AvatarStack faces={d.checkInFaces} />
@@ -291,11 +327,9 @@ export async function HostDashboard({
 
       {/* ── UPCOMING ─────────────────────────────────────────────────────── */}
       <SectionHeader title="Upcoming classes">
-        {d.upcoming.length > 0 && (
-          <Link href={`${base}/classes`} style={{ fontSize: 14, fontWeight: 600, color: C.brand }}>
-            View all classes
-          </Link>
-        )}
+        <Link href={`${BASE}/classes`} style={{ fontSize: 14, fontWeight: 600, color: C.brand }}>
+          View full calendar
+        </Link>
       </SectionHeader>
 
       {d.upcoming.length === 0 ? (
@@ -326,7 +360,7 @@ export async function HostDashboard({
               : "Post your first class and it goes live to dancers browsing StepUp straight away."}
           </p>
           <Link
-            href={newClassHref}
+            href={NEW_CLASS}
             style={{
               display: "inline-block",
               fontWeight: 700,
@@ -343,7 +377,7 @@ export async function HostDashboard({
         </div>
       ) : (
         <div style={{ marginBottom: 44 }}>
-          <ClassRowList classes={d.upcoming} base={base} action="manage" />
+          <ClassRowList classes={d.upcoming} base={BASE} action="manage" />
         </div>
       )}
 
@@ -355,12 +389,12 @@ export async function HostDashboard({
           </SectionHeader>
           <ClassRowList
             classes={d.past.slice(0, PAST_ON_DASHBOARD)}
-            base={base}
+            base={BASE}
             action="runAgain"
           />
           {d.past.length > PAST_ON_DASHBOARD && (
             <div style={{ marginTop: 14, textAlign: "center" }}>
-              <Link href={`${base}/classes`} style={{ fontSize: 14, fontWeight: 600, color: C.brand }}>
+              <Link href={`${BASE}/classes`} style={{ fontSize: 14, fontWeight: 600, color: C.brand }}>
                 Show all {d.past.length} past classes
               </Link>
             </div>
@@ -368,8 +402,13 @@ export async function HostDashboard({
         </>
       )}
 
-      {/* ── CLOSING INSIGHT — only once there is real history to draw on ─── */}
-      {d.dancers.size > 0 && d.averageFillPct !== null && d.bestFill && (
+      {/* ── CLOSING INSIGHT ───────────────────────────────────────────────
+          Single column on purpose. The comp's right-hand panel charted
+          "posted publicly only" against "shared to your dancer list"; that
+          comparison is a counterfactual nothing in the data can answer, and
+          there is no share feature behind it, so the panel is gone rather
+          than filled with invented figures. */}
+      {d.dancers.size > 0 && (
         <section
           style={{
             marginTop: 52,
@@ -377,8 +416,6 @@ export async function HostDashboard({
             borderRadius: 28,
             background: C.card,
             overflow: "hidden",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
           }}
         >
           <div
@@ -386,7 +423,6 @@ export async function HostDashboard({
               padding: "36px clamp(24px, 4vw, 40px)",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "space-between",
               gap: 28,
             }}
           >
@@ -424,15 +460,27 @@ export async function HostDashboard({
               >
                 Your dancer list is your fullest room.
               </h3>
-              <p style={{ fontSize: 15.5, color: C.inkSoft, margin: 0, maxWidth: 400 }}>
+              <p style={{ fontSize: 15.5, color: C.inkSoft, margin: 0, maxWidth: 460 }}>
                 {d.dancers.size} {d.dancers.size === 1 ? "person has" : "people have"} taken
-                a class with you. Your classes fill {d.averageFillPct}% of their spots on
-                average — these are the people most likely to close that gap.
+                a class with you.{" "}
+                {d.averageFillPct !== null
+                  ? `Across everything you have hosted, ${d.averageFillPct}% of the seats you offered were filled — `
+                  : ""}
+                {d.averageFillPct !== null
+                  ? "these are the people most likely to fill the rest."
+                  : "They already know the room, and they are the easiest seats to fill again."}
               </p>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <AvatarStack faces={d.dancers.faces} size={30} />
+                <span style={{ fontSize: 13.5, color: C.label }}>
+                  {describeFaces(d.dancers.faces, d.dancers.size)} from past classes
+                </span>
+              </div>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14 }}>
               <Link
-                href={`${base}/dancers`}
+                href={`${BASE}/dancers`}
                 style={{
                   fontWeight: 700,
                   fontSize: 15,
@@ -445,48 +493,12 @@ export async function HostDashboard({
               >
                 See who&apos;s on it
               </Link>
-              <Link href={newClassHref} style={{ fontSize: 14.5, fontWeight: 600, color: C.inkSoft }}>
+              <Link href={NEW_CLASS} style={{ fontSize: 14.5, fontWeight: 600, color: C.inkSoft }}>
                 Create a class
               </Link>
             </div>
           </div>
 
-          <div
-            style={{
-              background: C.tinted,
-              borderLeft: `1px solid oklch(92% 0.01 70)`,
-              padding: "36px clamp(24px, 4vw, 40px)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 24,
-              justifyContent: "center",
-            }}
-          >
-            <ReachBar
-              label="Average fill across your classes"
-              value={`${d.averageFillPct}%`}
-              pct={d.averageFillPct}
-              tone={C.barEmpty}
-              delay={0}
-            />
-            <ReachBar
-              label={`Your best — ${d.bestFill.title}`}
-              value={`${d.bestFill.booked} of ${d.bestFill.capacity}`}
-              pct={
-                d.bestFill.capacity > 0
-                  ? Math.round((d.bestFill.booked / d.bestFill.capacity) * 100)
-                  : 0
-              }
-              tone={C.brand}
-              delay={0.15}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 6 }}>
-              <AvatarStack faces={d.dancers.faces} size={30} ringColor={C.tinted} />
-              <span style={{ fontSize: 13.5, color: C.label }}>
-                {describeFaces(d.dancers.faces, d.dancers.size)} from past classes
-              </span>
-            </div>
-          </div>
         </section>
       )}
     </>
@@ -576,60 +588,6 @@ function SectionHeader({
         {title}
       </h2>
       {children}
-    </div>
-  );
-}
-
-function ReachBar({
-  label,
-  value,
-  pct,
-  tone,
-  delay,
-}: {
-  label: string;
-  value: string;
-  pct: number;
-  tone: string;
-  delay: number;
-}) {
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 12,
-          marginBottom: 9,
-        }}
-      >
-        <span style={{ fontSize: 13.5, fontWeight: 600, color: C.inkSoft }}>{label}</span>
-        <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 17, whiteSpace: "nowrap" }}>
-          {value}
-        </span>
-      </div>
-      <div
-        aria-hidden
-        style={{
-          height: 8,
-          borderRadius: 999,
-          background: "oklch(92% 0.012 70)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          className="stepup-grow"
-          style={{
-            height: "100%",
-            width: `${Math.max(Math.min(pct, 100), 2)}%`,
-            borderRadius: 999,
-            background: tone,
-            transformOrigin: "left",
-            animation: `stepup-seg-grow 0.8s ease-out ${delay}s both`,
-          }}
-        />
-      </div>
     </div>
   );
 }

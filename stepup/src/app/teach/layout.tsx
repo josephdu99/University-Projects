@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/session";
-import { HostShell } from "@/components/host/HostShell";
+import { AppShell } from "@/components/nav/AppShell";
 
 export default async function TeachLayout({
   children,
@@ -7,9 +7,5 @@ export default async function TeachLayout({
   children: React.ReactNode;
 }) {
   const user = await requireRole("INSTRUCTOR");
-  return (
-    <HostShell base="/teach" user={{ name: user.name ?? "You", role: user.role }}>
-      {children}
-    </HostShell>
-  );
+  return <AppShell user={user}>{children}</AppShell>;
 }

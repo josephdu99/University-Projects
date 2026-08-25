@@ -13,7 +13,7 @@ export function HostNavLink({ href, label }: { href: string; label: string }) {
 
   // "/studio" must not light up while you are on "/studio/classes", so the
   // dashboard link matches exactly and the rest match their subtree.
-  const isDashboard = href === "/studio" || href === "/teach";
+  const isDashboard = href === "/studio";
   const active = isDashboard
     ? pathname === href
     : pathname === href || pathname.startsWith(`${href}/`);

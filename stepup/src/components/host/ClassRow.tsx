@@ -16,7 +16,7 @@ export function ClassRow({
   action,
 }: {
   c: HostClass;
-  base: "/studio" | "/teach";
+  base: "/studio";
   first: boolean;
   /** Past classes offer "Run again"; upcoming ones offer "Manage". */
   action: "manage" | "runAgain";
@@ -195,7 +195,7 @@ export function ClassRowList({
   action,
 }: {
   classes: HostClass[];
-  base: "/studio" | "/teach";
+  base: "/studio";
   action: "manage" | "runAgain";
 }) {
   return (

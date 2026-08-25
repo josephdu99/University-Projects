@@ -7,9 +7,5 @@ export default async function StudioLayout({
   children: React.ReactNode;
 }) {
   const user = await requireRole("STUDIO_OWNER");
-  return (
-    <HostShell base="/studio" user={{ name: user.name ?? "You", role: user.role }}>
-      {children}
-    </HostShell>
-  );
+  return <HostShell user={{ name: user.name ?? "You" }}>{children}</HostShell>;
 }

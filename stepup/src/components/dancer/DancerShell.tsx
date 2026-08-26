@@ -9,13 +9,14 @@ import { HostNavLink } from "@/components/host/HostNavLink";
  * Dancer-side chrome, matching the studio shell: text nav with an accent
  * underline on the active item and an initials avatar, no emoji.
  *
- * Leaderboard is deliberately absent. The handoff's copy rules rule out
- * gamification vocabulary on this surface; the route still works for anyone
- * holding the link, it just is not advertised here.
+ * Leaderboard is listed. The Discover handoff dropped it; the Profile handoff
+ * puts it back and explains why — it is the one place ranking is allowed,
+ * because it ranks real actions, is opt-in, and resets monthly.
  */
 const NAV = [
   { href: "/discover", label: "Discover" },
   { href: "/schedule", label: "My classes" },
+  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/profile", label: "Profile" },
 ];
 
@@ -23,7 +24,7 @@ export function DancerShell({
   user,
   children,
 }: {
-  user: { name: string };
+  user: { name: string; avatarColor?: string };
   children: ReactNode;
 }) {
   return (
@@ -128,7 +129,7 @@ export function DancerShell({
               height: 38,
               flex: "none",
               borderRadius: 999,
-              background: C.brand,
+              background: user.avatarColor ?? C.brand,
               color: C.onBrand,
               display: "flex",
               alignItems: "center",

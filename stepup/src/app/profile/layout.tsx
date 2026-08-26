@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/session";
 import { AppShell } from "@/components/nav/AppShell";
-import { HostShell } from "@/components/host/HostShell";
+import { DancerShell } from "@/components/dancer/DancerShell";
 
 export default async function ProfileLayout({
   children,
@@ -9,17 +9,10 @@ export default async function ProfileLayout({
 }) {
   const user = await requireUser();
 
-  // Profile is the one page both sides share. Hosts keep the studio nav here
-  // rather than being dropped into the dancer shell mid-session.
-  if (user.role === "STUDIO_OWNER" || user.role === "INSTRUCTOR") {
-    return (
-      <HostShell
-        base={user.role === "STUDIO_OWNER" ? "/studio" : "/teach"}
-        user={{ name: user.name ?? "You", role: user.role }}
-      >
-        {children}
-      </HostShell>
-    );
+  // Only the dancer profile was redesigned; studio owners, instructors and
+  // admins keep the shell and the page they already had.
+  if (user.role === "STUDENT") {
+    return <DancerShell user={{ name: user.name ?? "You", avatarColor: user.avatarColor }}>{children}</DancerShell>;
   }
 
   return <AppShell user={user}>{children}</AppShell>;

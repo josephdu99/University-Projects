@@ -7,5 +7,5 @@ export default async function StudentLayout({
   children: React.ReactNode;
 }) {
   const user = await requireRole("STUDENT");
-  return <DancerShell user={{ name: user.name ?? "You" }}>{children}</DancerShell>;
+  return <DancerShell user={{ name: user.name ?? "You", avatarColor: user.avatarColor }}>{children}</DancerShell>;
 }

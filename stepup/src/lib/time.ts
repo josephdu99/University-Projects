@@ -169,4 +169,4 @@ export function isoWeeksBetween(
   return Math.round((b - a) / (7 * 86400000));
 }
 
-export { format };
+export { format, formatInTimeZone };

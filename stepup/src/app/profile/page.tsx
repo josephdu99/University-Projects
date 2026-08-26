@@ -14,6 +14,7 @@ import { ProfileForm } from "./ProfileForm";
 import { PasswordForm } from "./PasswordForm";
 import { StudioForm } from "./StudioForm";
 import { VerifyBanner } from "@/components/VerifyBanner";
+import { DancerProfile } from "@/components/dancer/DancerProfile";
 
 export default async function ProfilePage() {
   const sessionUser = await requireUser();
@@ -37,6 +38,30 @@ export default async function ProfilePage() {
 
   const netEarningsCents =
     (earnings._sum.amountCents ?? 0) - (earnings._sum.feeCents ?? 0);
+
+  if (user.role === "STUDENT") {
+    return (
+      <>
+        {!sessionUser.verified && (
+          <div className="mb-4">
+            <VerifyBanner verified={sessionUser.verified} />
+          </div>
+        )}
+        <DancerProfile
+          user={{
+            id: user.id,
+            name: user.name,
+            homeCity: user.homeCity,
+            timezone: user.timezone,
+            avatarColor: user.avatarColor,
+            avatarEmoji: user.avatarEmoji,
+            emailVerifiedAt: user.emailVerifiedAt,
+            createdAt: user.createdAt,
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">

@@ -143,6 +143,9 @@ async function main() {
         timezone: tz,
         avatarEmoji: emoji,
         avatarColor: color,
+        // Demo dancers are on the leaderboard so it has something to show.
+        // Real accounts start opted out — see the User model.
+        leaderboardOptIn: true,
         profile: { create: {} },
       })
     )

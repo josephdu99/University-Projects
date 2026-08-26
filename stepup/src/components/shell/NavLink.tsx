@@ -8,13 +8,19 @@ import { C } from "@/lib/marketing-theme";
  * Nav link with the design's 2px accent underline on the active route.
  * Client-side only because it needs the current pathname.
  */
-export function HostNavLink({ href, label }: { href: string; label: string }) {
+export function NavLink({
+  href,
+  label,
+  exact = false,
+}: {
+  href: string;
+  label: string;
+  /** Match this path only — for section roots like "/studio" that would
+   *  otherwise stay lit on "/studio/classes". */
+  exact?: boolean;
+}) {
   const pathname = usePathname();
-
-  // "/studio" must not light up while you are on "/studio/classes", so the
-  // dashboard link matches exactly and the rest match their subtree.
-  const isDashboard = href === "/studio" || href === "/teach";
-  const active = isDashboard
+  const active = exact
     ? pathname === href
     : pathname === href || pathname.startsWith(`${href}/`);
 

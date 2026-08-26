@@ -130,6 +130,13 @@ body {
   }
 }
 
+/* Leaderboard: podium cards and rows enter on a capped stagger. The movement
+   is deliberate — it is what tells you the ranking changed when you switch
+   metric or city. */
+.stepup-row-in {
+  animation: stepup-line-in 0.4s ease-out both;
+}
+
 /* Continuous bouncing and pulsing are exactly the kind of motion that triggers
    vestibular discomfort. Everything here settles into its finished state
    instead of looping — the week card still reads correctly, it just doesn't
@@ -157,5 +164,9 @@ body {
   .stepup-grow {
     animation: none !important;
     transform: scaleX(1) !important;
+  }
+  /* Leaderboard rows land in place with no entrance at all. */
+  .stepup-row-in {
+    animation: none !important;
   }
 }

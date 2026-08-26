@@ -12,6 +12,7 @@ import { StatTile } from "@/components/gamification/StatTile";
 import { BadgeGrid } from "@/components/gamification/BadgeGrid";
 import { ProfileForm } from "./ProfileForm";
 import { PasswordForm } from "./PasswordForm";
+import { VisibilityForm } from "./VisibilityForm";
 import { StudioForm } from "./StudioForm";
 import { VerifyBanner } from "@/components/VerifyBanner";
 
@@ -134,6 +135,10 @@ export default async function ProfilePage() {
             emoji: user.studio.emoji,
           }}
         />
+      )}
+
+      {user.role === "STUDENT" && (
+        <VisibilityForm optedIn={user.leaderboardOptIn} />
       )}
 
       <PasswordForm />

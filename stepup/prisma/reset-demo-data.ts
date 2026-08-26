@@ -8,6 +8,7 @@
  * Pass --dry-run first to see what would be deleted.
  */
 import { db } from "../src/lib/db";
+import { assertNotProduction } from "../src/lib/environment";
 
 const DEMO_EMAIL_PATTERNS = [
   "@stepup.dance",
@@ -19,6 +20,10 @@ const DEMO_EMAIL_PATTERNS = [
 const dryRun = process.argv.includes("--dry-run");
 
 async function main() {
+  // Deleting demo accounts is exactly the sort of thing that should not happen
+  // to Production by a mistyped DATABASE_URL. --force is the deliberate override.
+  if (!dryRun) assertNotProduction("reset-demo-data");
+
   const demoUsers = await db.user.findMany({
     where: { OR: DEMO_EMAIL_PATTERNS.map((p) => ({ email: { endsWith: p } })) },
     select: { id: true, email: true, role: true },

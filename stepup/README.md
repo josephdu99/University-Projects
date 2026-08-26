@@ -135,7 +135,9 @@ A few things that are easy to get wrong and are handled deliberately:
 1. Import the repo into a Vercel project.
 2. Add a Postgres database from the Storage tab. Neon/Vercel populate
    `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, which the app and migrations
-   pick up automatically.
+   pick up automatically. Preview deployments use a separate Neon branch via
+   `STAGING_DATABASE_URL` / `STAGING_DATABASE_URL_UNPOOLED` — see
+   [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md).
 3. Add `AUTH_SECRET`, and the Stripe/Resend variables if you want payments and
    real email.
 4. Deploy. `vercel-build` runs `prisma migrate deploy` on every deploy, so the

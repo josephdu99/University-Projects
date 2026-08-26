@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { APP_ENV } from "@/lib/environment";
+import { databaseHost } from "@/lib/database-url";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export async function GET() {
     return NextResponse.json({
       status: "ok",
       environment: APP_ENV,
+      vercelEnv: process.env.VERCEL_ENV ?? null,
       databaseHost: databaseHost(),
       database: "connected",
       latencyMs: Date.now() - started,
@@ -29,22 +31,12 @@ export async function GET() {
       {
         status: "degraded",
         environment: APP_ENV,
+        vercelEnv: process.env.VERCEL_ENV ?? null,
         databaseHost: databaseHost(),
         database: "unreachable",
         timestamp: new Date().toISOString(),
       },
       { status: 503 }
     );
-  }
-}
-
-/** Host only — never the credentials in the connection string. */
-function databaseHost(): string {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_PRISMA_URL;
-  if (!url) return "unset";
-  try {
-    return new URL(url).host;
-  } catch {
-    return "unparseable";
   }
 }

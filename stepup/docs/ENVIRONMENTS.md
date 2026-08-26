@@ -49,14 +49,26 @@ tick **Preview** only (leave Production alone):
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | the `staging` branch **pooled** string |
-| `DATABASE_URL_UNPOOLED` | the `staging` branch **direct** string |
+| `STAGING_DATABASE_URL` | the `staging` branch **pooled** string |
+| `STAGING_DATABASE_URL_UNPOOLED` | the `staging` branch **direct** string |
 | `AUTH_SECRET` | a **different** secret from Production (`openssl rand -base64 32`) |
 | `APP_ENV` | `test` |
 | `SHOW_DEMO_LOGINS` | `true` — handy on Test, stays off in Production |
 | `STRIPE_SECRET_KEY` | Stripe **test mode** key, if payments are on |
 | `STRIPE_WEBHOOK_SECRET` | the test webhook's signing secret |
 | `RESEND_API_KEY` | leave **unset** so Test emails print to the log instead of sending |
+
+The database variables are deliberately named `STAGING_*` rather than being
+Preview-scoped copies of `DATABASE_URL`. The Neon–Vercel integration manages
+`DATABASE_URL` across *all* environments, so overriding it per-environment is
+fragile — the integration can rewrite it. Instead the code checks
+`VERCEL_ENV === "preview"` and reads `STAGING_DATABASE_URL` /
+`STAGING_DATABASE_URL_UNPOOLED` (see `src/lib/database-url.ts`), leaving the
+integration's variables alone.
+
+If a Preview deployment reaches that code and `STAGING_DATABASE_URL` is not
+set, it **throws instead of falling back**. A build that fails loudly is much
+better than a test deployment that quietly writes to the live database.
 
 `AUTH_SECRET` differing is deliberate: it means a Test session cannot be
 replayed against Production.
@@ -74,8 +86,17 @@ Vercel → **Settings → Domains** → **Add** → e.g. `test-stepup.vercel.app
 Open `https://<your-test-url>/api/health`. You should see:
 
 ```json
-{ "status": "ok", "environment": "test", "databaseHost": "ep-…-staging-….neon.tech" }
+{
+  "status": "ok",
+  "environment": "test",
+  "vercelEnv": "preview",
+  "databaseHost": "ep-…-staging-….neon.tech"
+}
 ```
+
+`environment` is `APP_ENV` when you set it, otherwise it is derived from
+`VERCEL_ENV` (`preview` → `test`). `vercelEnv` is the raw Vercel value, so you
+can tell the two apart when they disagree.
 
 Two things to confirm: `environment` says `test`, and `databaseHost` is **not**
 the same host Production reports. If the hosts match, stop — Preview is still
@@ -118,6 +139,10 @@ going to fail, it fails there — which is the whole point.
 
 - `src/lib/environment.ts` — resolves `APP_ENV` from `APP_ENV` or `VERCEL_ENV`.
   Everything else reads from here rather than sniffing env vars itself.
+- `src/lib/database-url.ts` — the single place that decides *which database*.
+  Preview reads `STAGING_DATABASE_URL(_UNPOOLED)`; Production and local dev read
+  `DATABASE_URL(_UNPOOLED)`. Both the app (`src/lib/db.ts`) and migrations
+  (`prisma.config.ts`) go through it, so they cannot disagree.
 - `EnvironmentRibbon` — the orange **TEST** badge. Renders nothing in
   Production, so a screenshot of Test is never mistaken for the live site.
 - `src/app/robots.ts` and the root `metadata.robots` — non-production

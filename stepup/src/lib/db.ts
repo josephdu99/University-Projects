@@ -1,14 +1,14 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { resolveDatabaseUrl } from "@/lib/database-url";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const connectionString =
-  process.env.DATABASE_URL ??
-  process.env.POSTGRES_PRISMA_URL ??
-  process.env.POSTGRES_URL;
+// Preview deployments resolve to the staging Neon branch; Production and
+// local development are unchanged. See src/lib/database-url.ts.
+const connectionString = resolveDatabaseUrl();
 
 if (!connectionString) {
   throw new Error(

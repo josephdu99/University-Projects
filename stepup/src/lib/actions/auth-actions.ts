@@ -335,6 +335,32 @@ export async function updateProfileAction(
   return { success: "Profile updated." };
 }
 
+/**
+ * The leaderboard opt-in. Its own action rather than a field on the profile
+ * form: appearing on a public board is a privacy decision, and it should take
+ * one deliberate click rather than riding along with a name change.
+ */
+export async function updateLeaderboardVisibilityAction(
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const user = await requireUser();
+  const optIn = formData.get("optIn") === "true";
+
+  await db.user.update({
+    where: { id: user.id },
+    data: { leaderboardOptIn: optIn },
+  });
+
+  revalidatePath("/profile");
+  revalidatePath("/leaderboard");
+  return {
+    success: optIn
+      ? "You'll appear on the leaderboard."
+      : "You're hidden from the leaderboard.",
+  };
+}
+
 const changePasswordSchema = z
   .object({
     current: z.string().min(1, "Enter your current password"),

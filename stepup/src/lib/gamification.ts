@@ -152,67 +152,7 @@ export async function recordAttendance(
   });
 }
 
-export async function getGlobalLeaderboard(limit = 20) {
-  return db.gamificationProfile.findMany({
-    where: { user: { suspendedAt: null, role: "STUDENT" } },
-    orderBy: { totalPoints: "desc" },
-    take: limit,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          avatarEmoji: true,
-          avatarColor: true,
-          homeCity: true,
-        },
-      },
-    },
-  });
-}
-
-export async function getWeeklyLeaderboard(limit = 20) {
-  const since = new Date();
-  since.setDate(since.getDate() - 7);
-
-  // Aggregate in the database rather than pulling every booking into memory —
-  // this scales with active users instead of total attendance history.
-  const rows = await db.$queryRaw<
-    {
-      userId: string;
-      points: bigint;
-      name: string;
-      avatarEmoji: string;
-      avatarColor: string;
-      homeCity: string | null;
-    }[]
-  >`
-    SELECT b."userId"                AS "userId",
-           SUM(c."points")::bigint   AS "points",
-           u."name"                  AS "name",
-           u."avatarEmoji"           AS "avatarEmoji",
-           u."avatarColor"           AS "avatarColor",
-           u."homeCity"              AS "homeCity"
-    FROM "Booking" b
-    JOIN "DanceClass" c ON c."id" = b."classId"
-    JOIN "User" u       ON u."id" = b."userId"
-    WHERE b."status" = 'ATTENDED'
-      AND b."attendedAt" >= ${since}
-      AND u."suspendedAt" IS NULL
-    GROUP BY b."userId", u."name", u."avatarEmoji", u."avatarColor", u."homeCity"
-    ORDER BY "points" DESC
-    LIMIT ${limit}
-  `;
-
-  return rows.map((r) => ({
-    userId: r.userId,
-    points: Number(r.points),
-    user: {
-      id: r.userId,
-      name: r.name,
-      avatarEmoji: r.avatarEmoji,
-      avatarColor: r.avatarColor,
-      homeCity: r.homeCity,
-    },
-  }));
-}
+// The points-ranked leaderboard queries that used to live here are gone.
+// /leaderboard now ranks dancers on classes they actually attended this month
+// (src/lib/leaderboard.ts); points stay a private progress marker on the
+// dancer's own profile rather than something they are publicly ordered by.

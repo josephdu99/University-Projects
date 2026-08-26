@@ -3,32 +3,46 @@ import type { ReactNode } from "react";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { C, DISPLAY, marketingFontClass } from "@/lib/marketing-theme";
 import { initialsOf } from "@/lib/style-chips";
-import { HostNavLink } from "./HostNavLink";
+import { NavLink } from "./NavLink";
 
-/**
- * Shell for the studio / instructor side of the app.
- *
- * Deliberately not the dancer AppShell: the host pages now follow the
- * marketing design system (Sora + Work Sans, warm palette, initials avatars)
- * while the dancer app still uses the older in-app theme.
- */
-export function HostShell({
-  base,
-  user,
-  children,
-}: {
-  /** "/studio" or "/teach" — the same nav serves both host types. */
-  base: "/studio" | "/teach";
-  user: { name: string; role: string };
-  children: ReactNode;
-}) {
-  const items = [
-    { href: base, label: base === "/studio" ? "Studio" : "Teaching" },
+export type NavItem = { href: string; label: string; exact?: boolean };
+
+/** Studio owners and independent instructors share one nav; only the root differs. */
+export function hostNav(base: "/studio" | "/teach"): NavItem[] {
+  return [
+    { href: base, label: base === "/studio" ? "Studio" : "Teaching", exact: true },
     { href: `${base}/classes`, label: "Classes" },
     { href: `${base}/dancers`, label: "Dancers" },
     { href: "/profile", label: "Profile" },
   ];
+}
 
+export const DANCER_NAV: NavItem[] = [
+  { href: "/discover", label: "Discover" },
+  { href: "/schedule", label: "My classes" },
+  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/profile", label: "Profile" },
+];
+
+/**
+ * The sticky page chrome shared by every page on the redesigned system —
+ * studio, teaching, profile and the leaderboard. One component so the nav,
+ * wordmark and account block cannot drift apart between sections.
+ *
+ * `maxWidth` is the only thing that varies: the host dashboards run wide,
+ * the leaderboard's column is 1000px per its handoff.
+ */
+export function AppChrome({
+  items,
+  user,
+  maxWidth = 1120,
+  children,
+}: {
+  items: NavItem[];
+  user: { name: string };
+  maxWidth?: number;
+  children: ReactNode;
+}) {
   return (
     <div
       className={marketingFontClass}
@@ -89,7 +103,7 @@ export function HostShell({
             }}
           >
             {items.map((item) => (
-              <HostNavLink key={item.href} href={item.href} label={item.label} />
+              <NavLink key={item.href} {...item} />
             ))}
           </nav>
         </div>
@@ -141,7 +155,7 @@ export function HostShell({
 
       <main
         style={{
-          maxWidth: 1120,
+          maxWidth,
           width: "100%",
           margin: "0 auto",
           padding: "36px clamp(20px, 5vw, 48px) 96px",

@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/session";
-import { HostShell } from "@/components/host/HostShell";
+import { AppChrome, hostNav } from "@/components/shell/AppChrome";
 
 export default async function TeachLayout({
   children,
@@ -8,8 +8,8 @@ export default async function TeachLayout({
 }) {
   const user = await requireRole("INSTRUCTOR");
   return (
-    <HostShell base="/teach" user={{ name: user.name ?? "You", role: user.role }}>
+    <AppChrome items={hostNav("/teach")} user={{ name: user.name ?? "You" }}>
       {children}
-    </HostShell>
+    </AppChrome>
   );
 }

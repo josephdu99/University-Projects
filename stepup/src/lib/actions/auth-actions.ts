@@ -9,7 +9,6 @@ import { signIn, signOut, LOGIN_ERROR_MESSAGES } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import { SIGNUP_ROLES } from "@/lib/roles";
 import { isValidTimeZone, DEFAULT_TIMEZONE } from "@/lib/time";
-import { isAvatarColor } from "@/lib/avatar-colors";
 import { issueToken, verifyToken, consumeToken, TOKEN_PURPOSE } from "@/lib/tokens";
 import { sendVerificationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -303,7 +302,9 @@ const profileSchema = z.object({
   bio: z.string().trim().max(280).optional(),
   timezone: z.string().refine(isValidTimeZone, "Pick a valid timezone"),
   avatarEmoji: z.string().trim().min(1).max(8),
-  avatarColor: z.string().refine(isAvatarColor, "Pick a valid colour"),
+  avatarColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a valid colour"),
 });
 
 export async function updateProfileAction(

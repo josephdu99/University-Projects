@@ -1,44 +1,35 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
+import { ClassCard, type ClassCardData } from "@/components/classes/ClassCard";
 import { publicName } from "@/lib/roles";
-import { C, DISPLAY } from "@/lib/marketing-theme";
-import { dateBlockParts, formatDuration, formatMoney } from "@/lib/time";
+import { PillLink } from "@/components/ui/PillLink";
 import { VerifyBanner } from "@/components/VerifyBanner";
-import { DiscoverBrowser } from "@/components/dancer/DiscoverBrowser";
-import type { DiscoverClass } from "@/components/dancer/ClassCard";
 
-export const metadata = { title: "Find your next class — StepUp" };
+const FORMAT_FILTERS = [
+  { value: "", label: "All classes" },
+  { value: "IN_PERSON", label: "In person" },
+  { value: "ONLINE", label: "Online" },
+];
 
 const SEAT_HOLDING = ["BOOKED", "ATTENDED", "PENDING_PAYMENT"];
-
-/** Meter rank: 0 fills all three bars, 1–3 fill that many. */
-const LEVEL_RANK: Record<string, number> = {
-  ALL_LEVELS: 0,
-  BEGINNER: 1,
-  INTERMEDIATE: 2,
-  ADVANCED: 3,
-};
-
-const LEVEL_LABEL: Record<string, string> = {
-  ALL_LEVELS: "All levels",
-  BEGINNER: "Beginner",
-  INTERMEDIATE: "Intermediate",
-  ADVANCED: "Advanced",
-};
 
 export default async function DiscoverPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; format?: string; city?: string; style?: string }>;
+  searchParams: Promise<{ format?: string; style?: string; city?: string }>;
 }) {
   const user = await requireRole("STUDENT");
-  const params = await searchParams;
+  const { format, style, city } = await searchParams;
 
-  // Everything upcoming is fetched once; filtering happens in the browser so
-  // typing is instant. Sorted soonest first.
-  const [classes, myBookings] = await Promise.all([
+  const [classes, styles, cities, myBookings] = await Promise.all([
     db.danceClass.findMany({
-      where: { startTime: { gte: new Date() }, cancelledAt: null },
+      where: {
+        startTime: { gte: new Date() },
+        cancelledAt: null,
+        ...(format ? { format } : {}),
+        ...(style ? { style } : {}),
+        ...(city ? { studio: { city } } : {}),
+      },
       orderBy: { startTime: "asc" },
       take: 60,
       include: {
@@ -46,6 +37,17 @@ export default async function DiscoverPage({
         studio: { select: { name: true, city: true } },
         _count: { select: { bookings: { where: { status: { in: SEAT_HOLDING } } } } },
       },
+    }),
+    db.danceClass.findMany({
+      where: { startTime: { gte: new Date() }, cancelledAt: null },
+      select: { style: true },
+      distinct: ["style"],
+      orderBy: { style: "asc" },
+    }),
+    db.studio.findMany({
+      select: { city: true },
+      distinct: ["city"],
+      orderBy: { city: "asc" },
     }),
     db.booking.findMany({
       where: { userId: user.id, status: { not: "CANCELLED" } },
@@ -55,83 +57,110 @@ export default async function DiscoverPage({
 
   const statusByClass = new Map(myBookings.map((b) => [b.classId, b.status]));
 
-  const cards: DiscoverClass[] = classes.map((c) => {
-    // Times render in the class's own zone, matching the promise /studio makes.
-    const { month, day, time } = dateBlockParts(c.startTime, c.timezone);
-    const teacher = publicName(c.host);
-    const online = c.format === "ONLINE";
+  const cards: ClassCardData[] = classes.map((c) => ({
+    id: c.id,
+    title: c.title,
+    style: c.style,
+    format: c.format,
+    level: c.level,
+    startTime: c.startTime,
+    timezone: c.timezone,
+    durationMin: c.durationMin,
+    points: c.points,
+    capacity: c.capacity,
+    seatsTaken: c._count.bookings,
+    priceCents: c.priceCents,
+    currency: c.currency,
+    hostName: publicName(c.host),
+    studioName: c.studio?.name ?? null,
+    city: c.studio?.city ?? null,
+  }));
 
-    return {
-      id: c.id,
-      title: c.title,
-      style: c.style,
-      format: online ? "ONLINE" : "IN_PERSON",
-      level: LEVEL_LABEL[c.level] ?? c.level,
-      levelRank: LEVEL_RANK[c.level] ?? 0,
-      venue: c.studio?.name ?? teacher,
-      city: online ? "Live online" : (c.studio?.city ?? "In person"),
-      teacher,
-      month,
-      day,
-      time,
-      duration: formatDuration(c.durationMin),
-      price: c.priceCents === 0 ? "Free" : formatMoney(c.priceCents, c.currency),
-      booked: c._count.bookings,
-      capacity: c.capacity,
-      bookingStatus: statusByClass.get(c.id),
-    };
-  });
-
-  // Filter options come from what is actually on the platform, never a fixed list.
-  const styles = Array.from(new Set(cards.map((c) => c.style))).sort();
-  const cities = Array.from(new Set(cards.map((c) => c.city))).sort();
+  const query = (overrides: Record<string, string | undefined>) => {
+    const merged = { format, style, city, ...overrides };
+    return Object.fromEntries(
+      Object.entries(merged).filter(([, v]) => Boolean(v))
+    ) as Record<string, string>;
+  };
 
   return (
-    <>
-      <div style={{ marginBottom: 20 }}>
-        <VerifyBanner verified={user.verified} />
+    <div className="flex flex-col gap-5">
+      <VerifyBanner verified={user.verified} />
+
+      <div>
+        <h1 className="text-2xl font-extrabold text-ink">Discover classes</h1>
+        <p className="text-sm text-ink-soft">
+          Book in one tap — in person or online.
+        </p>
       </div>
 
-      <header style={{ marginBottom: 28 }}>
-        <h1
-          style={{
-            fontFamily: DISPLAY,
-            fontWeight: 800,
-            fontSize: "clamp(30px, 5vw, 40px)",
-            lineHeight: 1.1,
-            letterSpacing: "-0.02em",
-            margin: "0 0 10px",
-          }}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+        {FORMAT_FILTERS.map((f) => (
+          <PillLink
+            key={f.value}
+            active={(format ?? "") === f.value}
+            href={{ pathname: "/discover", query: query({ format: f.value || undefined }) }}
+          >
+            {f.label}
+          </PillLink>
+        ))}
+
+        <span className="mx-1 w-px shrink-0 self-stretch bg-border" />
+
+        <PillLink
+          active={!style}
+          href={{ pathname: "/discover", query: query({ style: undefined }) }}
         >
-          Find your next class
-        </h1>
-        <p style={{ fontSize: 17, color: "oklch(48% 0.02 60)", margin: 0 }}>
-          In person or online, one tap to book your spot.
+          All styles
+        </PillLink>
+        {styles.map((s) => (
+          <PillLink
+            key={s.style}
+            active={style === s.style}
+            href={{ pathname: "/discover", query: query({ style: s.style }) }}
+          >
+            {s.style}
+          </PillLink>
+        ))}
+
+        {cities.length > 1 && (
+          <>
+            <span className="mx-1 w-px shrink-0 self-stretch bg-border" />
+            <PillLink
+              active={!city}
+              href={{ pathname: "/discover", query: query({ city: undefined }) }}
+            >
+              All cities
+            </PillLink>
+            {cities.map((c) => (
+              <PillLink
+                key={c.city}
+                active={city === c.city}
+                href={{ pathname: "/discover", query: query({ city: c.city }) }}
+              >
+                {c.city}
+              </PillLink>
+            ))}
+          </>
+        )}
+      </div>
+
+      {cards.length === 0 ? (
+        <p className="rounded-2xl bg-surface-muted p-6 text-center text-sm text-ink-soft">
+          No upcoming classes match those filters yet.
         </p>
-      </header>
-
-      <DiscoverBrowser
-        classes={cards}
-        styles={styles}
-        cities={cities}
-        initial={{
-          q: params.q ?? "",
-          format: params.format === "ONLINE" || params.format === "IN_PERSON" ? params.format : "",
-          city: cities.includes(params.city ?? "") ? (params.city as string) : "",
-          style: styles.includes(params.style ?? "") ? (params.style as string) : "",
-        }}
-      />
-
-      <p
-        style={{
-          marginTop: 28,
-          fontSize: 13,
-          color: C.label,
-          textAlign: "center",
-        }}
-      >
-        Showing the next {cards.length} {cards.length === 1 ? "class" : "classes"}.
-      </p>
-    </>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((c) => (
+            <ClassCard
+              key={c.id}
+              data={c}
+              bookingStatus={statusByClass.get(c.id)}
+              viewerTimezone={user.timezone}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

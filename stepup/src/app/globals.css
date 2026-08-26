@@ -81,21 +81,6 @@ body {
 
 /* Host dashboard: segment / fill-bar entrance, row hover, ghost pill hover. */
 
-@keyframes stepup-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.stepup-card:hover {
-  border-color: oklch(80% 0.05 50);
-}
-
 @keyframes stepup-seg-grow {
   from {
     transform: scaleX(0);
@@ -172,9 +157,5 @@ body {
   .stepup-grow {
     animation: none !important;
     transform: scaleX(1) !important;
-  }
-  /* Discover cards land in place rather than sliding up. */
-  .stepup-card {
-    animation: none !important;
   }
 }

@@ -25,8 +25,6 @@ type Aggregate = {
 export type LeaderboardData = {
   rows: BoardRow[];
   cities: string[];
-  /** Instant the current month rolls over, in the viewer's zone. */
-  periodEndsAt: Date;
   viewerOptedIn: boolean;
 };
 
@@ -81,10 +79,12 @@ export async function getLeaderboard(viewer: {
 
   const viewerRow = rows.find((r) => r.isViewer);
 
+  // The reset date itself is not returned: the subhead states the rule
+  // ("It resets on the first."), which the handoff's copy rules fix verbatim,
+  // so nothing on the page needs the instant.
   return {
     rows,
     cities,
-    periodEndsAt: end,
     viewerOptedIn: viewerRow ? !viewerRow.privateToViewer : false,
   };
 }

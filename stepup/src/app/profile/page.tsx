@@ -1,37 +1,96 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { ROLE_LABEL, isHost, type Role } from "@/lib/roles";
+import { getDancerProfile } from "@/lib/dancer-profile";
+import { DEFAULT_AVATAR_COLOR } from "@/lib/avatar-colors";
 import { PayoutPanel } from "@/components/PayoutPanel";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Tag } from "@/components/ui/Pill";
-import { LevelProgress } from "@/components/gamification/LevelProgress";
-import { StatTile } from "@/components/gamification/StatTile";
-import { BadgeGrid } from "@/components/gamification/BadgeGrid";
+import { DancerProfile } from "@/components/dancer/DancerProfile";
+import {
+  EditProfilePanel,
+  PasswordPanel,
+  VisibilityPanel,
+} from "@/components/dancer/DancerProfileForms";
 import { ProfileForm } from "./ProfileForm";
 import { PasswordForm } from "./PasswordForm";
-import { VisibilityForm } from "./VisibilityForm";
 import { StudioForm } from "./StudioForm";
 import { VerifyBanner } from "@/components/VerifyBanner";
+import { C } from "@/lib/marketing-theme";
+
+export const metadata = { title: "Profile · StepUp" };
 
 export default async function ProfilePage() {
   const sessionUser = await requireUser();
 
-  const [user, payout, earnings] = await Promise.all([
-    db.user.findUniqueOrThrow({
-      where: { id: sessionUser.id },
-      include: {
-        profile: true,
-        studio: true,
-        badges: { include: { badge: true } },
-        _count: { select: { hostedClasses: true } },
-      },
-    }),
-    db.payoutAccount.findUnique({ where: { userId: sessionUser.id } }),
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: sessionUser.id },
+    include: { profile: true, studio: true, _count: { select: { hostedClasses: true } } },
+  });
+
+  if (user.role === "STUDENT") {
+    const data = await getDancerProfile({ id: user.id, timezone: user.timezone });
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {!user.emailVerifiedAt && (
+          <div style={{ marginBottom: 4 }}>
+            <VerifyBanner verified={false} />
+          </div>
+        )}
+
+        <DancerProfile
+          name={user.name}
+          city={user.homeCity}
+          avatarColor={user.avatarColor || DEFAULT_AVATAR_COLOR}
+          verified={Boolean(user.emailVerifiedAt)}
+          data={data}
+        />
+
+        <EditProfilePanel
+          defaults={{
+            name: user.name,
+            homeCity: user.homeCity ?? "",
+            timezone: user.timezone,
+            avatarColor: user.avatarColor || DEFAULT_AVATAR_COLOR,
+          }}
+        />
+
+        <VisibilityPanel optedIn={user.leaderboardOptIn} />
+
+        <PasswordPanel />
+
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            style={{
+              width: "100%",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontWeight: 600,
+              fontSize: 15,
+              padding: "14px 26px",
+              borderRadius: 999,
+              background: "transparent",
+              border: `1.5px solid ${C.border}`,
+              color: C.label,
+            }}
+          >
+            Log out of {user.email}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // ── Hosts and admins keep the existing profile ────────────────────────────
+  const [payout, earnings] = await Promise.all([
+    db.payoutAccount.findUnique({ where: { userId: user.id } }),
     db.payment.aggregate({
-      where: { status: "PAID", booking: { class: { hostId: sessionUser.id } } },
+      where: { status: "PAID", booking: { class: { hostId: user.id } } },
       _sum: { amountCents: true, feeCents: true },
     }),
   ]);
@@ -47,9 +106,7 @@ export default async function ProfilePage() {
         <Avatar emoji={user.avatarEmoji} color={user.avatarColor} size="xl" />
         <div>
           <h1 className="text-xl font-extrabold text-ink">{user.name}</h1>
-          <p className="text-sm text-ink-soft">
-            {ROLE_LABEL[user.role as Role]}
-          </p>
+          <p className="text-sm text-ink-soft">{ROLE_LABEL[user.role as Role]}</p>
           {user.homeCity && <p className="text-sm text-ink-soft">📍 {user.homeCity}</p>}
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {user.emailVerifiedAt ? (
@@ -60,35 +117,6 @@ export default async function ProfilePage() {
           </div>
         </div>
       </Card>
-
-      {user.role === "STUDENT" && (
-        <>
-          <Card className="p-5">
-            <LevelProgress points={user.profile?.totalPoints ?? 0} />
-          </Card>
-
-          <div className="grid grid-cols-3 gap-3">
-            <StatTile
-              emoji="🔥"
-              label="Week streak"
-              value={user.profile?.currentStreak ?? 0}
-            />
-            <StatTile
-              emoji="🕺"
-              label="Classes taken"
-              value={user.profile?.classesTaken ?? 0}
-            />
-            <StatTile emoji="🏅" label="Badges" value={user.badges.length} />
-          </div>
-
-          <div>
-            <h2 className="mb-3 text-lg font-bold text-ink">Badges</h2>
-            <BadgeGrid
-              earnedCodes={new Set(user.badges.map((b) => b.badge.code))}
-            />
-          </div>
-        </>
-      )}
 
       {user.role === "INSTRUCTOR" && (
         <Card className="flex flex-col gap-1 p-5">
@@ -135,10 +163,6 @@ export default async function ProfilePage() {
             emoji: user.studio.emoji,
           }}
         />
-      )}
-
-      {user.role === "STUDENT" && (
-        <VisibilityForm optedIn={user.leaderboardOptIn} />
       )}
 
       <PasswordForm />

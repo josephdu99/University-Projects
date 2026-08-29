@@ -137,6 +137,20 @@ body {
   animation: stepup-line-in 0.4s ease-out both;
 }
 
+/* Discover: result cards enter on a capped stagger when the filters change. */
+.stepup-card-in {
+  animation: stepup-line-in 0.4s ease-out both;
+}
+
+/* The booking control is the shared BookButton so the booking logic stays in
+   one place; this only resizes it to the card's proportions. */
+.stepup-book button {
+  width: 100%;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
 /* Continuous bouncing and pulsing are exactly the kind of motion that triggers
    vestibular discomfort. Everything here settles into its finished state
    instead of looping — the week card still reads correctly, it just doesn't
@@ -165,8 +179,9 @@ body {
     animation: none !important;
     transform: scaleX(1) !important;
   }
-  /* Leaderboard rows land in place with no entrance at all. */
-  .stepup-row-in {
+  /* Leaderboard rows and Discover cards land in place, no entrance at all. */
+  .stepup-row-in,
+  .stepup-card-in {
     animation: none !important;
   }
 }

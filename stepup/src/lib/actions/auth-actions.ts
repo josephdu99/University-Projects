@@ -9,20 +9,13 @@ import { signIn, signOut, LOGIN_ERROR_MESSAGES } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import { SIGNUP_ROLES } from "@/lib/roles";
 import { isValidTimeZone, DEFAULT_TIMEZONE } from "@/lib/time";
+import { AVATAR_COLORS, isAvatarColor } from "@/lib/avatar-colors";
 import { issueToken, verifyToken, consumeToken, TOKEN_PURPOSE } from "@/lib/tokens";
 import { sendVerificationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logError, logInfo } from "@/lib/logger";
 
 const AVATAR_EMOJIS = ["🕺", "💃", "⚡", "🌟", "🔥", "🎀", "🌊", "🎤", "🩰", "🚀"];
-const AVATAR_COLORS = [
-  "#FC5200",
-  "#7C5CFC",
-  "#12B886",
-  "#F59F00",
-  "#E64980",
-  "#1E90FF",
-];
 
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
 
@@ -301,10 +294,10 @@ const profileSchema = z.object({
   homeCity: z.string().trim().max(60).optional(),
   bio: z.string().trim().max(280).optional(),
   timezone: z.string().refine(isValidTimeZone, "Pick a valid timezone"),
-  avatarEmoji: z.string().trim().min(1).max(8),
-  avatarColor: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, "Pick a valid colour"),
+  // The dancer profile does not edit the emoji, so it is optional here and
+  // left untouched when absent rather than being cleared.
+  avatarEmoji: z.string().trim().min(1).max(8).optional(),
+  avatarColor: z.string().refine(isAvatarColor, "Pick a valid colour"),
 });
 
 export async function updateProfileAction(
@@ -326,7 +319,7 @@ export async function updateProfileAction(
       homeCity: parsed.data.homeCity || null,
       bio: parsed.data.bio || null,
       timezone: parsed.data.timezone,
-      avatarEmoji: parsed.data.avatarEmoji,
+      ...(parsed.data.avatarEmoji ? { avatarEmoji: parsed.data.avatarEmoji } : {}),
       avatarColor: parsed.data.avatarColor,
     },
   });

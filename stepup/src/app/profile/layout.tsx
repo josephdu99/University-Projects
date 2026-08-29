@@ -1,6 +1,5 @@
 import { requireUser } from "@/lib/session";
-import { AppShell } from "@/components/nav/AppShell";
-import { AppChrome, hostNav } from "@/components/shell/AppChrome";
+import { AppChrome, DANCER_NAV, hostNav } from "@/components/shell/AppChrome";
 
 export default async function ProfileLayout({
   children,
@@ -9,18 +8,16 @@ export default async function ProfileLayout({
 }) {
   const user = await requireUser();
 
-  // Profile is the one page both sides share. Hosts keep the studio nav here
+  // Profile is the one page every role shares. Hosts keep the studio nav here
   // rather than being dropped into the dancer shell mid-session.
-  if (user.role === "STUDIO_OWNER" || user.role === "INSTRUCTOR") {
-    return (
-      <AppChrome
-        items={hostNav(user.role === "STUDIO_OWNER" ? "/studio" : "/teach")}
-        user={{ name: user.name ?? "You" }}
-      >
-        {children}
-      </AppChrome>
-    );
-  }
+  const host = user.role === "STUDIO_OWNER" || user.role === "INSTRUCTOR";
+  const items = host
+    ? hostNav(user.role === "STUDIO_OWNER" ? "/studio" : "/teach")
+    : DANCER_NAV;
 
-  return <AppShell user={user}>{children}</AppShell>;
+  return (
+    <AppChrome items={items} user={{ name: user.name ?? "You" }} maxWidth={1000}>
+      {children}
+    </AppChrome>
+  );
 }

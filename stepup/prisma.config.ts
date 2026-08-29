@@ -2,17 +2,17 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
-import { resolveMigrationUrl } from "./src/lib/database-url";
 
 // Prefer a direct (non-pooled) connection for migrations when available —
 // pooled/pgbouncer connections (e.g. Neon's DATABASE_URL, Vercel's
 // POSTGRES_PRISMA_URL) don't reliably support the advisory locks Prisma
 // Migrate needs.
-//
-// This is the dangerous one to get wrong: `vercel-build` runs
-// `prisma migrate deploy`, so on a Preview deployment this must resolve to
-// the staging Neon branch or a test build would migrate the live database.
-const migrationUrl = resolveMigrationUrl();
+const migrationUrl =
+  process.env["DATABASE_URL_UNPOOLED"] ??
+  process.env["POSTGRES_URL_NON_POOLING"] ??
+  process.env["DATABASE_URL"] ??
+  process.env["POSTGRES_PRISMA_URL"] ??
+  process.env["POSTGRES_URL"];
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

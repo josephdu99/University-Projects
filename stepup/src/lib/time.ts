@@ -116,28 +116,6 @@ export function addDaysToDateString(date: string, days: number): string {
   return utc.toISOString().slice(0, 10);
 }
 
-/**
- * The instants a calendar month starts and ends at, as measured in `timeZone`.
- *
- * The leaderboard resets on the 1st, and "the 1st" is a wall-clock date in the
- * dancer's own zone — not 1 January 00:00 UTC, which in Sydney is already
- * mid-morning on the 1st, and in Los Angeles is still 4pm on the 31st.
- * `end` is exclusive.
- */
-export function monthBoundsInTimeZone(instant: Date, timeZone: string) {
-  const year = Number(formatInTimeZone(instant, timeZone, "yyyy"));
-  const month = Number(formatInTimeZone(instant, timeZone, "MM"));
-  const pad = (n: number) => String(n).padStart(2, "0");
-
-  const nextYear = month === 12 ? year + 1 : year;
-  const nextMonth = month === 12 ? 1 : month + 1;
-
-  return {
-    start: fromZonedTime(`${year}-${pad(month)}-01T00:00:00`, timeZone),
-    end: fromZonedTime(`${nextYear}-${pad(nextMonth)}-01T00:00:00`, timeZone),
-  };
-}
-
 /** Day of week (0 = Sunday … 6 = Saturday) for an instant in a zone. */
 export function dayOfWeekInTimeZone(instant: Date, timeZone: string): number {
   // date-fns "i" is ISO (1 = Monday … 7 = Sunday); normalise to 0 = Sunday.

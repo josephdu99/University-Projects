@@ -103,28 +103,10 @@ See `src/lib/gamification-rules.ts` (pure logic) and `src/lib/gamification.ts`
 - **Badges** (10) are evaluated after every check-in — milestones, streaks,
   style/studio variety, and time-of-day badges based on the class's local
   wall-clock hour.
+- **Leaderboards** cover all-time and a rolling 7 days, aggregated in SQL.
+
 Points have no monetary value and can be adjusted by an admin when misuse is
-detected. They are a private progress marker on a dancer's own profile —
-**nobody is publicly ranked on them.**
-
-### The leaderboard
-
-`/leaderboard` (`src/lib/leaderboard.ts`, `src/lib/leaderboard-data.ts`) is
-deliberately not a points board:
-
-- **Ranked on attendance.** Classes danced, or distinct styles explored —
-  things the dancer actually did. Never on spend.
-- **Monthly.** Only the current calendar month counts, measured in the
-  dancer's own timezone, so a long-tenured account cannot sit on top forever.
-- **Opt-in.** `User.leaderboardOptIn` defaults to `false`; a dancer only
-  appears once they turn it on at `/profile#visibility`. The viewer always
-  sees their own row, marked "Only visible to you" while they are hidden.
-- **Invisible to hosts.** The route is STUDENT-only, so a studio cannot look
-  up where its dancers place.
-- **Ties share a rank** (1, 2, 2, 4), displayed alphabetically.
-
-Metric and city are client-side switches over one server-ranked payload and
-are mirrored into the URL, so a view is shareable and survives a refresh.
+detected.
 
 ## Notes on correctness
 
@@ -153,9 +135,7 @@ A few things that are easy to get wrong and are handled deliberately:
 1. Import the repo into a Vercel project.
 2. Add a Postgres database from the Storage tab. Neon/Vercel populate
    `DATABASE_URL` and `DATABASE_URL_UNPOOLED`, which the app and migrations
-   pick up automatically. Preview deployments use a separate Neon branch via
-   `STAGING_DATABASE_URL` / `STAGING_DATABASE_URL_UNPOOLED` — see
-   [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md).
+   pick up automatically.
 3. Add `AUTH_SECRET`, and the Stripe/Resend variables if you want payments and
    real email.
 4. Deploy. `vercel-build` runs `prisma migrate deploy` on every deploy, so the

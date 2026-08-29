@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/session";
-import { AppChrome, hostNav } from "@/components/shell/AppChrome";
+import { HostShell } from "@/components/host/HostShell";
 
 export default async function StudioLayout({
   children,
@@ -8,8 +8,8 @@ export default async function StudioLayout({
 }) {
   const user = await requireRole("STUDIO_OWNER");
   return (
-    <AppChrome items={hostNav("/studio")} user={{ name: user.name ?? "You" }}>
+    <HostShell base="/studio" user={{ name: user.name ?? "You", role: user.role }}>
       {children}
-    </AppChrome>
+    </HostShell>
   );
 }

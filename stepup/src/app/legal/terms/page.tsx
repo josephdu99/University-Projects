@@ -68,12 +68,6 @@ export default function TermsPage() {
         adjust or reset them where we detect misuse — for example, claiming
         attendance for classes you didn&apos;t attend.
       </p>
-      <p className="mt-2">
-        The leaderboard is separate and opt-in: you only appear on it if you
-        turn it on in your profile, it ranks dancers on classes attended in the
-        current month and nothing else, and it resets on the first of each
-        month.
-      </p>
 
       <h2 className="mt-4 text-lg font-bold text-ink">7. Acceptable use</h2>
       <p>

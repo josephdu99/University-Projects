@@ -32,12 +32,6 @@ model User {
   avatarEmoji  String    @default("🕺")
   avatarColor  String    @default("#FC5200")
 
-  // Leaderboards are opt-in, not opt-out: a dancer is only ever listed once
-  // they have chosen to appear. Defaulting this to true would make the
-  // board's own footer ("only include dancers who chose to appear") a lie.
-  // The toggle lives on /profile#visibility.
-  leaderboardOptIn Boolean @default(false)
-
   emailVerifiedAt DateTime?
   // Set when an admin suspends the account; suspended users cannot sign in.
   suspendedAt     DateTime?
@@ -60,7 +54,6 @@ model User {
 
   @@index([role])
   @@index([suspendedAt])
-  @@index([leaderboardOptIn])
 }
 
 // Email verification + password reset tokens. Only a hash of the token is

@@ -37,11 +37,9 @@ const COPY: Record<
       "Book classes, earn points, and keep your streak alive — free forever for dancers.",
     benefits: [
       "Unlimited class browsing & one-tap booking",
-      // The leaderboard ranks attendance, not points, resets monthly, and you
-      // are only on it if you opt in — so the benefit says exactly that.
-      "An opt-in monthly leaderboard for your city",
-      // The comp said "friend challenges". There is no friends feature, so
-      // this describes the streak instead.
+      "Points, badges & weekly leaderboards",
+      // The comp said "friend challenges". There is no friends feature — the
+      // weekly leaderboard is platform-wide — so this describes the streak.
       "Streaks that reward showing up",
       "Free forever — no credit card required",
     ],

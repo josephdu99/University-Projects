@@ -59,11 +59,8 @@ export default function PrivacyPage() {
           name and avatar on their roster so they can check you in.
         </li>
         <li>
-          <strong>Other dancers</strong> — only if you turn on leaderboard
-          visibility in your profile. Then your name, initials, city and the
-          number of classes you attended this month appear on the monthly
-          leaderboard. It is off by default and you can turn it off again at
-          any time.
+          <strong>Other dancers</strong> — your name, avatar, city and points
+          appear on public leaderboards.
         </li>
         <li>
           <strong>Service providers</strong> — Stripe (payments), our email

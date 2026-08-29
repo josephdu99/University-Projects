@@ -61,6 +61,11 @@ tick **Preview** only (leave Production alone):
 `AUTH_SECRET` differing is deliberate: it means a Test session cannot be
 replayed against Production.
 
+> **`STAGING_DATABASE_URL` is not read by this code.** If those variables are
+> still set in Vercel, they are inert — see the deployment log at the bottom.
+> A Preview-scoped `DATABASE_URL`, as in the table above, is the only thing
+> that separates Test from the live database right now.
+
 ### 3. Give Test a stable URL
 
 By default every push gets a new random preview URL. To get one address that
@@ -140,3 +145,43 @@ going to fail, it fails there — which is the whole point.
 - **Test still sends nothing by default.** With `RESEND_API_KEY` unset, the
   email layer logs the message instead of delivering it, so test signups cannot
   mail real people.
+
+---
+
+## Deployment log
+
+Only entries where an environment was changed by hand, outside the `staging`
+→ `main` flow above. A rollback that leaves no trace is the kind of thing
+somebody rediscovers at the worst moment.
+
+### 29 Aug 2026 — Test rolled back to the Production build
+
+The Production build was manually redeployed onto the Test alias from the
+Vercel dashboard, replacing the deployment that was there. Git was then
+brought to the same state, so the branch matches what is actually running:
+`staging` was rolled forward to the Production tree in `346fc41`, and
+`git diff main staging` is now empty.
+
+**Rolled off `staging`, both recoverable:**
+
+| Commit | What it was |
+|---|---|
+| `efb0e3c` | The `/leaderboard` rebuild — attendance-ranked, opt-in, monthly. The old points-ranked board is what runs now. |
+| `e4cb73f` | Preview database routing: `src/lib/database-url.ts`, which switched the app *and* `prisma migrate deploy` onto `STAGING_DATABASE_URL` when `VERCEL_ENV` was `preview`. |
+
+```bash
+git cherry-pick e4cb73f   # database isolation back, without the leaderboard
+git cherry-pick efb0e3c   # the leaderboard back
+```
+
+**What this changed about isolation.** With `e4cb73f` gone, nothing in the
+code looks at `VERCEL_ENV` to pick a database. Both the app and migrations
+read `DATABASE_URL`, and the Neon–Vercel integration sets `DATABASE_URL` in
+every environment. So Test is only separate from Production for as long as
+step 2's Preview-scoped `DATABASE_URL` override is in place. Check it the way
+step 4 says — compare `databaseHost` on the two `/api/health` endpoints — and
+if they match, Test is writing to live data.
+
+**Leftover in the Test database.** The staging Neon branch still has the
+`leaderboardOptIn` column that `efb0e3c`'s migration added. Nothing reads it
+now, so it is harmless; a **Reset from parent** clears it.

@@ -96,6 +96,17 @@ export function formatClassWhenLong(instant: Date, timeZone: string): string {
   return formatInTimeZone(instant, timeZone, "EEEE d MMMM yyyy 'at' h:mmaaa (zzz)");
 }
 
+/**
+ * Day and time without the zone — for places already rendering in the
+ * viewer's own timezone, where naming it again is noise rather than
+ * information. e.g. "Friday 4 September, 7:00pm".
+ */
+export function formatClassDayTime(instant: Date, timeZone: string): string {
+  const day = formatInTimeZone(instant, timeZone, "EEEE d MMMM");
+  const time = formatInTimeZone(instant, timeZone, "h:mmaaa").toLowerCase();
+  return `${day}, ${time}`;
+}
+
 /** "yyyy-MM-dd" and "HH:mm" of an instant in a zone, for prefilling forms. */
 export function toFormFields(instant: Date, timeZone: string) {
   return {

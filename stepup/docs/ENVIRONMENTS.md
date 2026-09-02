@@ -122,6 +122,13 @@ git push origin main             # → deploys to Production
 `--ff-only` is intentional: it fails loudly if `main` has drifted, instead of
 quietly creating a merge you did not intend.
 
+**Promote from the dashboard only as a last resort.** Promoting a Preview
+deployment to Production reuses the build that already exists, so
+`vercel-build` never runs again — and neither does `prisma migrate deploy`.
+Any migration in that change reaches the Test database and never the live
+one, which surfaces as 500s on whichever page reads the new column. Merging
+and letting Vercel build is what keeps schema and code in step.
+
 ### Refreshing Test with current Production data
 
 In Neon: **Branches → `staging` → Reset from parent**. That discards whatever
@@ -173,6 +180,35 @@ going to fail, it fails there — which is the whole point.
 Only entries where an environment was changed by hand, outside the `staging`
 → `main` flow above. A rollback that leaves no trace is the kind of thing
 somebody rediscovers at the worst moment. Newest first.
+
+### 1 Sep 2026 — the dancer redesign went to Production
+
+The Test deployment was promoted to Production from the Vercel dashboard,
+putting the rebuilt Discover, My classes, Leaderboard and Profile pages on
+the live site. `main` was then fast-forwarded to `staging` (`7db301c`) so the
+branch matches what is running, which is the normal flow — it just happened
+after the fact rather than causing the deploy.
+
+**Why the fast-forward was not optional.** Promoting reuses the build that
+already exists; it does not re-run `vercel-build`, and therefore does not run
+`prisma migrate deploy`. The promoted code reads `User.leaderboardOptIn`, a
+column added by `20260826020000_add_leaderboard_opt_in`, which until now had
+only ever been applied to the **staging** Neon branch. Pushing `main` triggers
+a real Production build, which applies it to the live database.
+
+If you promote a Preview deployment again, check both of these before calling
+it done:
+
+1. `GET /api/health` on the Production URL reports `"vercelEnv":"production"`
+   and the Production `databaseHost` — **not** the staging one. A promoted
+   build carrying Preview environment variables would resolve to
+   `STAGING_DATABASE_URL` and serve the test database to real users.
+2. `/leaderboard` and `/profile` load. They are the pages that touch the
+   column the migration adds, so they are where an unapplied migration shows
+   up first.
+
+The safe order is the one in *Day to day* above: merge `staging` into `main`
+and let Vercel build, rather than promoting an artifact.
 
 ### 29 Aug 2026 — database isolation restored
 

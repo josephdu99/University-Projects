@@ -126,6 +126,36 @@ deliberately not a points board:
 Metric and city are client-side switches over one server-ranked payload and
 are mirrored into the URL, so a view is shareable and survives a refresh.
 
+## The dancer pages
+
+`/discover`, `/schedule`, `/leaderboard` and `/profile` share one chrome
+(`src/components/shell/AppChrome.tsx`), one segmented control and one token
+set (`src/lib/marketing-theme.ts`). They were built from design handoffs, and
+the rule applied throughout was to **leave out anything the data cannot
+support rather than invent it**:
+
+| Asked for | Why it is absent |
+| --- | --- |
+| Movement chips (`+2` / `level`) | Needs a weekly rank snapshot table |
+| "Just friends" filter, friends-going avatars | Needs a connection graph |
+| "Friends brought" metric and stat tile | No referral feature exists |
+| "Bring a friend, you both save" | A pricing promise with nothing behind it |
+| "Notify me" alerts | No alerts feature; the empty state offers Clear filters |
+
+What each page derives from real data:
+
+- **Discover** — search, format, city and style compose and are mirrored into
+  the URL. Style counts are computed as though the style filter were off, so
+  they stay useful instead of collapsing to the current selection.
+- **My classes** — the hero's four states (`now` / `today` / `tomorrow` /
+  `soon`) come from the real start time, with day boundaries in the dancer's
+  own timezone. `Add to calendar` serves a real `.ics` from
+  `/api/classes/[id]/calendar`, gated on having a live booking.
+- **Profile** — journey stages are thresholds on countable things (classes
+  attended, distinct styles), never a judgement about technique. The story
+  timeline is built only from attendance that happened, sorted on the real
+  date rather than the formatted month name.
+
 ## Notes on correctness
 
 A few things that are easy to get wrong and are handled deliberately:
@@ -197,8 +227,16 @@ src/lib/stripe.ts             Connect onboarding, checkout, webhooks, refunds
 src/lib/email.ts              Pluggable transactional email
 src/lib/tokens.ts             Hashed, single-use verification/reset tokens
 src/lib/rate-limit.ts         Database-backed sliding-window limiter
+src/lib/leaderboard.ts        Pure board ranking (unit tested)
+src/lib/leaderboard-data.ts   The board's one aggregate query
+src/lib/dancer-profile.ts     Journey, weeks, totals and story, all derived
+src/lib/my-classes.ts         Next-class phase and "first time" notes (tested)
 src/lib/actions/              Server Actions (auth, classes, payouts, admin)
-src/app/(student)/            Discover, Schedule, Leaderboard, class detail
+src/components/shell/         AppChrome — the nav every redesigned page shares
+src/components/dancer/        Discover, profile and their forms
+src/app/discover/ · /schedule/ · /leaderboard/ · /profile/
+                              The four dancer pages
+src/app/(student)/classes/    Class detail
 src/app/studio/ · /teach/     Host dashboards + roster/check-in
 src/app/admin/                Moderation and support tooling
 src/app/legal/                Terms and Privacy (templates)

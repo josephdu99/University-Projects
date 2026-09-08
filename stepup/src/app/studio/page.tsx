@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/session";
 import { HostDashboard } from "@/components/host/HostDashboard";
 import { VerifyBanner } from "@/components/VerifyBanner";
 
-export const metadata = { title: "Studio — StepUp" };
+export const metadata = { title: "Studio, StepUp" };
 
 export default async function StudioDashboardPage() {
   const user = await requireRole("STUDIO_OWNER");

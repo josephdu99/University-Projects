@@ -619,7 +619,7 @@ function ClassCard({ data, delay }: { data: DiscoverClass; delay: number }) {
       <div style={{ marginBottom: 9 }}>
         <span style={{ fontSize: 13.5, color: "oklch(50% 0.02 60)" }}>
           {full
-            ? "Full — join the waitlist"
+            ? "Full, join the waitlist"
             : tight
               ? `Only ${left} ${left === 1 ? "spot" : "spots"} left`
               : `${left} of ${data.capacity} spots open`}

@@ -5,7 +5,7 @@ import { EnvironmentRibbon } from "@/components/EnvironmentRibbon";
 import { isProduction } from "@/lib/environment";
 
 export const metadata: Metadata = {
-  title: "StepUp — Dance classes, gamified",
+  title: "StepUp, Dance classes, gamified",
   description:
     "Find and book dance classes at local studios or online, track your progress, and compete with friends.",
   // Only the live site should ever appear in search results. Test deployments

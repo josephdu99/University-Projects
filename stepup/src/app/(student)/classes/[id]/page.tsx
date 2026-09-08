@@ -67,7 +67,7 @@ export default async function ClassDetailPage({
 
       {cancelled === "1" && (
         <p className="rounded-2xl bg-surface-muted px-4 py-3 text-sm text-ink-soft">
-          Payment cancelled — your spot wasn&apos;t reserved.
+          Payment cancelled, your spot wasn&apos;t reserved.
         </p>
       )}
 

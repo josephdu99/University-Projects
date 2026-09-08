@@ -267,7 +267,7 @@ async function main() {
         data: {
           title: u.title,
           style: u.style,
-          description: `${u.style} — ${u.fmt === "ONLINE" ? "live online" : "in the studio"}.`,
+          description: `${u.style}, ${u.fmt === "ONLINE" ? "live online" : "in the studio"}.`,
           format: u.fmt,
           level: "ALL_LEVELS",
           timezone: u.tz,

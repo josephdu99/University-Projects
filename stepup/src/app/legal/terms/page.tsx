@@ -1,4 +1,4 @@
-export const metadata = { title: "Terms of Service — StepUp" };
+export const metadata = { title: "Terms of Service, StepUp" };
 
 const UPDATED = "23 July 2026";
 
@@ -9,7 +9,7 @@ export default function TermsPage() {
       <p className="text-xs">Last updated: {UPDATED}</p>
 
       <div className="rounded-xl border border-gold/40 bg-gold/10 p-4 text-ink">
-        <strong>Template — needs legal review before launch.</strong> This is a
+        <strong>Template, needs legal review before launch.</strong> This is a
         reasonable starting point drafted for an Australian marketplace, not
         legal advice. Have a lawyer review it and fill in the operator details
         below before taking real payments.
@@ -65,7 +65,7 @@ export default function TermsPage() {
       <p>
         Points, streaks, levels and badges are a free feature with no monetary
         value. They can&apos;t be exchanged, transferred or redeemed. We may
-        adjust or reset them where we detect misuse — for example, claiming
+        adjust or reset them where we detect misuse, for example, claiming
         attendance for classes you didn&apos;t attend.
       </p>
       <p className="mt-2">

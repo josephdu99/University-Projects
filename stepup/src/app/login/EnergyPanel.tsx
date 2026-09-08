@@ -136,7 +136,7 @@ export function EnergyPanel({
                     color: C.onDarkSoft,
                   }}
                 >
-                  — {line.author}
+                  {line.author}
                 </span>
               </>
             )}

@@ -427,7 +427,7 @@ export async function HostDashboard({
               <p style={{ fontSize: 15.5, color: C.inkSoft, margin: 0, maxWidth: 400 }}>
                 {d.dancers.size} {d.dancers.size === 1 ? "person has" : "people have"} taken
                 a class with you. Your classes fill {d.averageFillPct}% of their spots on
-                average — these are the people most likely to close that gap.
+                average, these are the people most likely to close that gap.
               </p>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14 }}>
@@ -470,7 +470,7 @@ export async function HostDashboard({
               delay={0}
             />
             <ReachBar
-              label={`Your best — ${d.bestFill.title}`}
+              label={`Your best, ${d.bestFill.title}`}
               value={`${d.bestFill.booked} of ${d.bestFill.capacity}`}
               pct={
                 d.bestFill.capacity > 0

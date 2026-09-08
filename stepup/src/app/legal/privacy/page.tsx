@@ -1,4 +1,4 @@
-export const metadata = { title: "Privacy Policy — StepUp" };
+export const metadata = { title: "Privacy Policy, StepUp" };
 
 const UPDATED = "23 July 2026";
 
@@ -9,7 +9,7 @@ export default function PrivacyPage() {
       <p className="text-xs">Last updated: {UPDATED}</p>
 
       <div className="rounded-xl border border-gold/40 bg-gold/10 p-4 text-ink">
-        <strong>Template — needs legal review before launch.</strong> Drafted
+        <strong>Template, needs legal review before launch.</strong> Drafted
         against the Australian Privacy Principles, but not legal advice. Have a
         lawyer review it and fill in the operator details before collecting real
         user data.
@@ -18,20 +18,20 @@ export default function PrivacyPage() {
       <h2 className="mt-4 text-lg font-bold text-ink">What we collect</h2>
       <ul className="ml-5 list-disc space-y-1">
         <li>
-          <strong>Account details</strong> — your name, email address, city,
+          <strong>Account details</strong>, your name, email address, city,
           timezone, chosen avatar, and a securely hashed password. We never
           store your password in readable form.
         </li>
         <li>
-          <strong>Activity</strong> — classes you book, attendance, points,
+          <strong>Activity</strong>, classes you book, attendance, points,
           streaks and badges.
         </li>
         <li>
-          <strong>Host details</strong> — if you list classes, your studio name,
+          <strong>Host details</strong>, if you list classes, your studio name,
           address and class listings.
         </li>
         <li>
-          <strong>Security data</strong> — sign-in attempts, and a hashed
+          <strong>Security data</strong>, sign-in attempts, and a hashed
           (non-reversible) form of your IP address, used to block brute-force
           attacks.
         </li>
@@ -55,18 +55,18 @@ export default function PrivacyPage() {
       <h2 className="mt-4 text-lg font-bold text-ink">Who we share it with</h2>
       <ul className="ml-5 list-disc space-y-1">
         <li>
-          <strong>Hosts</strong> — when you book a class, the host sees your
+          <strong>Hosts</strong>, when you book a class, the host sees your
           name and avatar on their roster so they can check you in.
         </li>
         <li>
-          <strong>Other dancers</strong> — only if you turn on leaderboard
+          <strong>Other dancers</strong>, only if you turn on leaderboard
           visibility in your profile. Then your name, initials, city and the
           number of classes you attended this month appear on the monthly
           leaderboard. It is off by default and you can turn it off again at
           any time.
         </li>
         <li>
-          <strong>Service providers</strong> — Stripe (payments), our email
+          <strong>Service providers</strong>, Stripe (payments), our email
           provider (transactional email), and our hosting and database
           providers.
         </li>

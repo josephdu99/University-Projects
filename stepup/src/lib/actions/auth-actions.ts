@@ -130,7 +130,7 @@ export async function signUpAction(
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      return { error: "Account created — please log in." };
+      return { error: "Account created, please log in." };
     }
     throw err;
   }
@@ -187,7 +187,7 @@ export async function resendVerificationAction(): Promise<FormState> {
 
   const limit = await checkRateLimit(`verify:${record.email}`, 3, 15 * 60_000);
   if (!limit.allowed) {
-    return { error: "We just sent one — check your inbox, or try again shortly." };
+    return { error: "We just sent one, check your inbox, or try again shortly." };
   }
 
   try {

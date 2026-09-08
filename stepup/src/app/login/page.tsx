@@ -14,7 +14,7 @@ import { LoginForm } from "./LoginForm";
 import { EnergyPanel } from "./EnergyPanel";
 
 export const metadata = {
-  title: "Log in — StepUp",
+  title: "Log in, StepUp",
   description: "Log in to book your next dance class on StepUp.",
 };
 

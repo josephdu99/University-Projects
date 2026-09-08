@@ -104,7 +104,7 @@ export async function sendPasswordResetEmail(params: {
     subject: "Reset your StepUp password",
     html: layout(
       "Reset your password",
-      "<p>We received a request to reset your StepUp password. This link expires in 1 hour.</p><p>If you didn't ask for this, you can safely ignore this email — your password won't change.</p>",
+      "<p>We received a request to reset your StepUp password. This link expires in 1 hour.</p><p>If you didn't ask for this, you can safely ignore this email, your password won't change.</p>",
       { label: "Reset password", url }
     ),
     text: `Reset your StepUp password: ${url}\n\nThis link expires in 1 hour. If you didn't request it, ignore this email.`,

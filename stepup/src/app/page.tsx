@@ -17,9 +17,9 @@ const STUDIO_SWATCHES = [
 ];
 
 export const metadata = {
-  title: "StepUp — Book a class in one tap",
+  title: "StepUp, Book a class in one tap",
   description:
-    "Find dance classes nearby or online, and keep showing up — StepUp keeps score so you don't have to.",
+    "Find dance classes nearby or online, and keep showing up, StepUp keeps score so you don't have to.",
 };
 
 export default async function Home() {
@@ -161,7 +161,7 @@ export default async function Home() {
               margin: "0 0 32px",
             }}
           >
-            Find dance classes nearby or online, and keep showing up — StepUp
+            Find dance classes nearby or online, and keep showing up, StepUp
             keeps score so you don&apos;t have to.
           </p>
           <div
@@ -184,7 +184,7 @@ export default async function Home() {
                 textDecoration: "none",
               }}
             >
-              Get started — it&apos;s free
+              Get started, it&apos;s free
             </Link>
             <Link
               href="/discover"
@@ -263,8 +263,8 @@ export default async function Home() {
                 margin: 0,
               }}
             >
-              Every class you book quietly builds your streak and your standing
-              — no extra taps, no busywork. Just glance and see how your week is
+              Every class you book quietly builds your streak and your standing,
+              no extra taps, no busywork. Just glance and see how your week is
               going.
             </p>
           </div>
@@ -294,7 +294,7 @@ export default async function Home() {
             Built around the dance floor
           </h2>
           <p style={{ fontSize: 17, color: C.inkSoft, margin: 0 }}>
-            Whether you&apos;re dancing, teaching, or running the studio —
+            Whether you&apos;re dancing, teaching, or running the studio, 
             StepUp keeps everyone moving.
           </p>
         </div>
@@ -343,7 +343,7 @@ export default async function Home() {
               }}
             >
               Browse classes at local studios or live online with independent
-              instructors. One tap books your spot — no back-and-forth, no
+              instructors. One tap books your spot, no back-and-forth, no
               waiting on confirmation.
             </p>
           </div>
@@ -368,7 +368,7 @@ export default async function Home() {
           <AudienceCard
             eyebrow="FOR STUDIOS"
             title="Fill your rosters, check in with a tap."
-            body="List your classes, manage capacity, and check students in at the door — no clipboard required."
+            body="List your classes, manage capacity, and check students in at the door, no clipboard required."
           />
           <AudienceCard
             eyebrow="FOR INDEPENDENT INSTRUCTORS"
@@ -746,7 +746,7 @@ export default async function Home() {
             textDecoration: "none",
           }}
         >
-          Get started — it&apos;s free
+          Get started, it&apos;s free
         </Link>
       </div>
 
@@ -935,7 +935,7 @@ function HeroArt() {
             6-week streak
           </div>
           <div style={{ fontSize: 13, color: C.inkSoft }}>
-            Keep it alive — book your next class
+            Keep it alive, book your next class
           </div>
         </div>
       </div>

@@ -75,7 +75,7 @@ export async function HostCreateClassPage({
       </h1>
       <p style={{ fontSize: 15, color: C.label, margin: "0 0 28px" }}>
         {defaults
-          ? `Everything from ${defaults.title} is filled in — pick a new date and publish.`
+          ? `Everything from ${defaults.title} is filled in, pick a new date and publish.`
           : `Times are in ${timezone.replace(/_/g, " ")}, the zone your classes run in.`}
       </p>
 

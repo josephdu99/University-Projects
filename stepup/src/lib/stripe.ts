@@ -18,7 +18,7 @@ export function stripeClient(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) {
     throw new Error(
-      "STRIPE_SECRET_KEY is not set — paid classes are unavailable until it is configured."
+      "STRIPE_SECRET_KEY is not set, paid classes are unavailable until it is configured."
     );
   }
   // Pinned to the version this SDK was built against. Bumping the SDK will

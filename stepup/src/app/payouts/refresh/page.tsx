@@ -18,7 +18,7 @@ export default async function PayoutRefreshPage() {
         <h1 className="text-xl font-bold text-ink">That link expired</h1>
         <p className="text-sm text-ink-soft">
           Stripe onboarding links are single-use and short-lived. Start again to
-          pick up where you left off — nothing you entered was lost.
+          pick up where you left off, nothing you entered was lost.
         </p>
         {isHost(user.role) && (
           <form action={startPayoutOnboardingAction}>

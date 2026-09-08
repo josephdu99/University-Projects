@@ -72,7 +72,7 @@ export function ClassCard({
 
       <div className="flex items-center justify-between text-xs text-ink-soft">
         <span className={isFull ? "font-medium text-red-500" : ""}>
-          {isFull ? "Full — waitlist open" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`}
+          {isFull ? "Full, waitlist open" : `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`}
         </span>
       </div>
 

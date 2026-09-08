@@ -146,7 +146,7 @@ export function WeekActivityCard() {
           #2
         </div>
         <div style={{ fontSize: 13.5, color: "oklch(90% 0.01 70)" }}>
-          on StepUp this week — one spot from the top.
+          on StepUp this week, one spot from the top.
         </div>
       </div>
     </div>

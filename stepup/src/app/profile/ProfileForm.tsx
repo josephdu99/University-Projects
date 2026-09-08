@@ -64,7 +64,7 @@ export function ProfileForm({
 
         {showBio && (
           <label className="flex flex-col gap-1 text-xs text-ink-soft">
-            Display name — what dancers see on your classes
+            Display name, what dancers see on your classes
             <input
               name="displayName"
               defaultValue={defaults.displayName}

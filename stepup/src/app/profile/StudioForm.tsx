@@ -72,7 +72,7 @@ export function StudioForm({
         </label>
 
         <label className="flex flex-col gap-1 text-xs text-ink-soft">
-          Timezone — new classes use this for their local times
+          Timezone, new classes use this for their local times
           <select name="timezone" defaultValue={defaults.timezone} className={inputClass}>
             {zones.map((tz) => (
               <option key={tz} value={tz}>

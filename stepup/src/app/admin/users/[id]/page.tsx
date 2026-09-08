@@ -93,7 +93,7 @@ export default async function AdminUserPage({
         {user.suspendedAt ? (
           <>
             <p className="text-sm text-ink-soft">
-              Suspended{user.suspendedReason ? ` — ${user.suspendedReason}` : ""}.
+              Suspended{user.suspendedReason ? `, ${user.suspendedReason}` : ""}.
               They can&apos;t sign in.
             </p>
             <form action={unsuspendUserAction.bind(null, user.id)}>
@@ -104,7 +104,7 @@ export default async function AdminUserPage({
           </>
         ) : user.id === admin.id ? (
           <p className="text-sm text-ink-soft">
-            This is your own account — suspension is disabled.
+            This is your own account, suspension is disabled.
           </p>
         ) : (
           <form

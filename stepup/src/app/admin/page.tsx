@@ -208,7 +208,7 @@ export default async function AdminPage({
               <div key={a.id} className="px-4 py-2.5 text-xs text-ink-soft">
                 <span className="font-semibold text-ink">{a.actor.name}</span>{" "}
                 {a.action} on {a.targetType} {a.targetId.slice(0, 8)}…
-                {a.detail ? ` — ${a.detail}` : ""}
+                {a.detail ? `, ${a.detail}` : ""}
               </div>
             ))}
           </Card>

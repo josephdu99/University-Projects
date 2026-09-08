@@ -34,7 +34,7 @@ const COPY: Record<
     cardDesc: "Book classes, earn points, and track streaks as a dancer.",
     headline: "Set up your dancer profile.",
     subhead:
-      "Book classes, earn points, and keep your streak alive — free forever for dancers.",
+      "Book classes, earn points, and keep your streak alive, free forever for dancers.",
     benefits: [
       "Unlimited class browsing & one-tap booking",
       // The leaderboard ranks attendance, not points, resets monthly, and you
@@ -43,7 +43,7 @@ const COPY: Record<
       // The comp said "friend challenges". There is no friends feature, so
       // this describes the streak instead.
       "Streaks that reward showing up",
-      "Free forever — no credit card required",
+      "Free forever, no credit card required",
     ],
     submitLabel: "Create free account",
   },
@@ -57,7 +57,7 @@ const COPY: Record<
       "List unlimited classes & locations",
       "Manage bookings & waitlists automatically",
       "Get discovered by nearby dancers",
-      "Free to list — pay only when you get bookings",
+      "Free to list, pay only when you get bookings",
     ],
     submitLabel: "Create studio account",
     orgFieldLabel: "Studio name",
@@ -73,7 +73,7 @@ const COPY: Record<
       "Host live sessions from anywhere",
       "Set your own schedule & pricing",
       "Reach dancers outside your city",
-      "Free to start — no setup fees",
+      "Free to start, no setup fees",
     ],
     submitLabel: "Create instructor account",
     orgFieldLabel: "Business / instructor name",
@@ -270,7 +270,7 @@ export function GetStartedFlow() {
               margin: "0 0 48px",
             }}
           >
-            You can always add more later — this just sets up your account
+            You can always add more later, this just sets up your account
             right.
           </p>
 

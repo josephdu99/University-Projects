@@ -3,7 +3,7 @@ import { ResetPasswordForm } from "./ResetPasswordForm";
 import { Card } from "@/components/ui/Card";
 import { ButtonLink } from "@/components/ui/Button";
 
-export const metadata = { title: "Choose a new password — StepUp" };
+export const metadata = { title: "Choose a new password, StepUp" };
 
 export default async function ResetPasswordPage({
   searchParams,

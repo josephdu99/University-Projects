@@ -5,9 +5,9 @@ import { marketingFontClass, BODY } from "@/lib/marketing-theme";
 import { GetStartedFlow } from "./GetStartedFlow";
 
 export const metadata = {
-  title: "Get started — StepUp",
+  title: "Get started, StepUp",
   description:
-    "Create your StepUp account — book classes as a dancer, list a studio, or teach online.",
+    "Create your StepUp account, book classes as a dancer, list a studio, or teach online.",
 };
 
 export default async function GetStartedPage() {

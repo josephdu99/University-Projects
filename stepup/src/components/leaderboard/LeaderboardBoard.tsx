@@ -557,7 +557,7 @@ function Standing({
             nextUp.gap === 1 ? SINGULAR[metric] : METRICS[metric].unit
           } would put you level with ${nextUp.name}.`,
         me.privateToViewer &&
-          "You are hidden from this board — nobody else can see your row.",
+          "You are hidden from this board, nobody else can see your row.",
       ]
         .filter(Boolean)
         .join(" ")

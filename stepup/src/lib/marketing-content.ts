@@ -26,5 +26,5 @@ export const TESTIMONIALS: Testimonial[] = [];
 export const LOGIN_ROTATING_LINES = [
   "One tap books your spot. No forms, no waiting on confirmation.",
   "Every class you attend earns points and pushes your level up.",
-  "Miss a week and the streak resets — that's the whole trick.",
+  "Miss a week and the streak resets, that's the whole trick.",
 ] as const;

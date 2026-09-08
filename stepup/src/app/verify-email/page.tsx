@@ -28,7 +28,7 @@ export default async function VerifyEmailPage({
           </h1>
           <p className="text-sm text-ink-soft">
             {ok
-              ? "Your account is fully set up — you're ready to book classes."
+              ? "Your account is fully set up, you're ready to book classes."
               : result?.error}
           </p>
           {ok ? (

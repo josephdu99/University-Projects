@@ -72,7 +72,7 @@ export default async function SchedulePage({
             fontWeight: 600,
           }}
         >
-          Payment received — you&apos;re booked in.
+          Payment received, you&apos;re booked in.
         </p>
       )}
 

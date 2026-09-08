@@ -342,7 +342,7 @@ export async function createClassAction(
     if (!payout?.chargesEnabled) {
       return {
         error:
-          "Set up payouts before charging for classes — see the Payouts section on your dashboard.",
+          "Set up payouts before charging for classes, see the Payouts section on your dashboard.",
       };
     }
   }
@@ -452,7 +452,7 @@ export async function editClassAction(
   }
   if (data.capacity < existing.bookings.length) {
     return {
-      error: `${existing.bookings.length} people are already booked — capacity can't go below that.`,
+      error: `${existing.bookings.length} people are already booked, capacity can't go below that.`,
     };
   }
 

@@ -109,7 +109,7 @@ export function CreateClassForm({
         {format === "IN_PERSON" ? (
           <input
             name="location"
-            placeholder="Location (optional — defaults to studio address)"
+            placeholder="Location (optional, defaults to studio address)"
             defaultValue={defaults?.location}
             className={inputClass}
           />
@@ -204,7 +204,7 @@ export function CreateClassForm({
         </div>
 
         <label className="flex flex-col gap-1 text-xs text-ink-soft">
-          Price (AUD) — leave 0 for a free class
+          Price (AUD), leave 0 for a free class
           <input
             name="priceDollars"
             type="number"

@@ -150,7 +150,7 @@ function summaryFor(stage: number, classes: number, styles: number) {
     return `${done} Three classes across two styles is where it starts to feel like a habit rather than a one-off.`;
   }
   if (stage === 1) {
-    return `${done} Ten classes is the next marker — by then the steps stop being the thing you are thinking about.`;
+    return `${done} Ten classes is the next marker, by then the steps stop being the thing you are thinking about.`;
   }
   return `${done} You are past the point where turning up is the hard part.`;
 }
@@ -219,7 +219,7 @@ function momentsFrom(events: Event[], tz: string): Moment[] {
     moments.push({
       on: secondStyle.on,
       title: "Tried a second style",
-      body: `${secondStyle.title} — ${secondStyle.style} after starting with ${first.style}.`,
+      body: `${secondStyle.title}, ${secondStyle.style} after starting with ${first.style}.`,
     });
   }
 

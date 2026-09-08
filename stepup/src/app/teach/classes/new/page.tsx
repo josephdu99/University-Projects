@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { HostCreateClassPage } from "@/components/host/HostCreateClassPage";
 
-export const metadata = { title: "Create a class — StepUp" };
+export const metadata = { title: "Create a class, StepUp" };
 
 export default async function TeachNewClassPage({
   searchParams,

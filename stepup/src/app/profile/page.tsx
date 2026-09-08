@@ -2,6 +2,14 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { ROLE_LABEL, isHost, type Role } from "@/lib/roles";
 import { getDancerProfile } from "@/lib/dancer-profile";
+import { getStudioProfile } from "@/lib/studio-profile";
+import { StudioProfileHeader } from "@/components/host/StudioProfile";
+import {
+  HostPasswordCard,
+  HostProfileCard,
+  PayoutsCard,
+  StudioDetailsCard,
+} from "@/components/host/StudioProfileForms";
 import { DEFAULT_AVATAR_COLOR } from "@/lib/avatar-colors";
 import { PayoutPanel } from "@/components/PayoutPanel";
 import { logoutAction } from "@/lib/actions/auth-actions";
@@ -19,7 +27,7 @@ import { ProfileForm } from "./ProfileForm";
 import { PasswordForm } from "./PasswordForm";
 import { StudioForm } from "./StudioForm";
 import { VerifyBanner } from "@/components/VerifyBanner";
-import { C } from "@/lib/marketing-theme";
+import { C, DISPLAY } from "@/lib/marketing-theme";
 
 export const metadata = { title: "Profile · StepUp" };
 
@@ -86,7 +94,6 @@ export default async function ProfilePage() {
     );
   }
 
-  // ── Hosts and admins keep the existing profile ────────────────────────────
   const [payout, earnings] = await Promise.all([
     db.payoutAccount.findUnique({ where: { userId: user.id } }),
     db.payment.aggregate({
@@ -98,6 +105,117 @@ export default async function ProfilePage() {
   const netEarningsCents =
     (earnings._sum.amountCents ?? 0) - (earnings._sum.feeCents ?? 0);
 
+  if (user.role === "STUDIO_OWNER" && user.studio) {
+    const data = await getStudioProfile({
+      id: user.id,
+      timezone: user.timezone,
+      payoutsActive: Boolean(payout?.chargesEnabled && payout?.payoutsEnabled),
+    });
+
+    return (
+      <div>
+        {!user.emailVerifiedAt && (
+          <div style={{ marginBottom: 16 }}>
+            <VerifyBanner verified={false} />
+          </div>
+        )}
+
+        <StudioProfileHeader
+          name={user.name}
+          role={ROLE_LABEL[user.role as Role]}
+          city={user.homeCity}
+          studioName={user.studio.name}
+          avatarColor={user.avatarColor || DEFAULT_AVATAR_COLOR}
+          verified={Boolean(user.emailVerifiedAt)}
+          data={data}
+        />
+
+        <PayoutsCard
+          status={payout?.status ?? null}
+          chargesEnabled={payout?.chargesEnabled ?? false}
+          payoutsEnabled={payout?.payoutsEnabled ?? false}
+          netEarningsCents={netEarningsCents}
+        />
+
+        <StudioDetailsCard
+          defaults={{
+            name: user.studio.name,
+            description: user.studio.description,
+            city: user.studio.city,
+            address: user.studio.address,
+            timezone: user.studio.timezone,
+            emoji: user.studio.emoji,
+          }}
+        />
+
+        <HostProfileCard
+          defaults={{
+            name: user.name,
+            homeCity: user.homeCity ?? "",
+            timezone: user.timezone,
+            avatarColor: user.avatarColor || DEFAULT_AVATAR_COLOR,
+          }}
+        />
+
+        <HostPasswordCard />
+
+        <section
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            padding: "24px clamp(22px, 4vw, 36px)",
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: 24,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                color: C.label,
+                marginBottom: 6,
+              }}
+            >
+              Account email
+            </div>
+            {/* The design pairs this with a "Change email" button. There is no
+                email-change flow — changing it would need re-verification and
+                a way back if the new address is wrong — so it is not drawn. */}
+            <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 17 }}>
+              {user.email}
+            </div>
+          </div>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              style={{
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontWeight: 600,
+                fontSize: 14.5,
+                padding: "11px 22px",
+                borderRadius: 999,
+                background: "none",
+                border: "1.5px solid oklch(89% 0.012 70)",
+                color: "oklch(30% 0.02 60)",
+              }}
+            >
+              Log out
+            </button>
+          </form>
+        </section>
+      </div>
+    );
+  }
+
+  // ── Instructors and admins keep the existing profile ──────────────────────
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
       <VerifyBanner verified={sessionUser.verified} />

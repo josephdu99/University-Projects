@@ -108,6 +108,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role as Role,
           avatarEmoji: user.avatarEmoji,
           avatarColor: user.avatarColor,
+          avatarMark: user.avatarMark,
           timezone: user.timezone,
           verified: user.emailVerifiedAt !== null,
         };
@@ -147,6 +148,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.name = record.name;
         token.avatarEmoji = record.avatarEmoji;
         token.avatarColor = record.avatarColor;
+        token.avatarMark = record.avatarMark;
         token.timezone = record.timezone;
         token.verified = record.emailVerifiedAt !== null;
       } else if (user) {
@@ -154,6 +156,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = user.role as Role;
         token.avatarEmoji = user.avatarEmoji as string;
         token.avatarColor = user.avatarColor as string;
+        token.avatarMark = (user.avatarMark as string | null) ?? null;
         token.timezone = user.timezone as string;
         token.verified = user.verified as boolean;
       }
@@ -169,6 +172,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: true,
             avatarEmoji: true,
             avatarColor: true,
+            avatarMark: true,
             timezone: true,
             emailVerifiedAt: true,
             suspendedAt: true,
@@ -179,6 +183,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.name = fresh.name;
           token.avatarEmoji = fresh.avatarEmoji;
           token.avatarColor = fresh.avatarColor;
+          token.avatarMark = fresh.avatarMark;
           token.timezone = fresh.timezone;
           token.verified = fresh.emailVerifiedAt !== null;
           token.suspended = fresh.suspendedAt !== null;
@@ -191,6 +196,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.id as string;
       session.user.role = token.role as Role;
       session.user.avatarEmoji = token.avatarEmoji as string;
+      session.user.avatarMark = (token.avatarMark as string | null) ?? null;
       session.user.avatarColor = token.avatarColor as string;
       session.user.timezone = token.timezone as string;
       session.user.verified = Boolean(token.verified);

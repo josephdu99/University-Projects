@@ -1,11 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useSession } from "next-auth/react";
 import { updateProfileAction } from "@/lib/actions/auth-actions";
 import { Card } from "@/components/ui/Card";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { COMMON_TIMEZONES } from "@/lib/time";
+import { AvatarMarkPicker } from "@/components/host/AvatarMarkPicker";
+import { DEFAULT_AVATAR_MARK, MARK_COLORS } from "@/lib/avatar-marks";
 
 const inputClass =
   "rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none focus:border-brand";
@@ -23,6 +25,7 @@ const COLOR_CHOICES = [
 export function ProfileForm({
   defaults,
   showBio,
+  useMark = false,
 }: {
   defaults: {
     name: string;
@@ -32,8 +35,11 @@ export function ProfileForm({
     timezone: string;
     avatarEmoji: string;
     avatarColor: string;
+    avatarMark: string | null;
   };
   showBio: boolean;
+  /** Instructors pick a line-art mark; everyone here keeps the emoji set. */
+  useMark?: boolean;
 }) {
   const { update } = useSession();
   const [state, formAction] = useActionState(
@@ -47,6 +53,13 @@ export function ProfileForm({
   );
 
   const zones = Array.from(new Set([defaults.timezone, ...COMMON_TIMEZONES]));
+  const [name, setName] = useState(defaults.name);
+  const [mark, setMark] = useState(defaults.avatarMark ?? DEFAULT_AVATAR_MARK);
+  const [markColor, setMarkColor] = useState(
+    (MARK_COLORS as readonly string[]).includes(defaults.avatarColor)
+      ? defaults.avatarColor
+      : MARK_COLORS[0]
+  );
 
   return (
     <Card className="flex flex-col gap-3 p-5">
@@ -57,7 +70,8 @@ export function ProfileForm({
           <input
             name="name"
             required
-            defaultValue={defaults.name}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className={inputClass}
           />
         </label>
@@ -110,42 +124,52 @@ export function ProfileForm({
           </select>
         </label>
 
+        {useMark ? (
+          <AvatarMarkPicker
+            name={name}
+            mark={mark}
+            color={markColor}
+            onMarkChange={setMark}
+            onColorChange={setMarkColor}
+          />
+        ) : (
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="text-xs text-ink-soft">Avatar</legend>
-          <div className="flex flex-wrap gap-1.5">
-            {EMOJI_CHOICES.map((e) => (
-              <label key={e} className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="avatarEmoji"
-                  value={e}
-                  defaultChecked={e === defaults.avatarEmoji}
-                  className="peer sr-only"
-                />
-                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-lg peer-checked:border-brand peer-checked:bg-brand-light">
-                  {e}
-                </span>
-              </label>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {COLOR_CHOICES.map((c) => (
-              <label key={c} className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="avatarColor"
-                  value={c}
-                  defaultChecked={c === defaults.avatarColor}
-                  className="peer sr-only"
-                />
-                <span
-                  className="block h-7 w-7 rounded-full border-2 border-transparent peer-checked:border-ink"
-                  style={{ backgroundColor: c }}
-                />
-              </label>
-            ))}
-          </div>
-        </fieldset>
+            <legend className="text-xs text-ink-soft">Avatar</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {EMOJI_CHOICES.map((e) => (
+                <label key={e} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="avatarEmoji"
+                    value={e}
+                    defaultChecked={e === defaults.avatarEmoji}
+                    className="peer sr-only"
+                  />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-lg peer-checked:border-brand peer-checked:bg-brand-light">
+                    {e}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {COLOR_CHOICES.map((c) => (
+                <label key={c} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="avatarColor"
+                    value={c}
+                    defaultChecked={c === defaults.avatarColor}
+                    className="peer sr-only"
+                  />
+                  <span
+                    className="block h-7 w-7 rounded-full border-2 border-transparent peer-checked:border-ink"
+                    style={{ backgroundColor: c }}
+                  />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         {state?.error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">

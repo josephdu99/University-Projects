@@ -8,7 +8,7 @@ export default async function ScheduleLayout({
 }) {
   const user = await requireRole("STUDENT");
   return (
-    <AppChrome items={DANCER_NAV} user={{ name: user.name ?? "You" }} maxWidth={1000}>
+    <AppChrome items={DANCER_NAV} user={{ name: user.name ?? "You", mark: user.avatarMark, color: user.avatarColor }} maxWidth={1000}>
       {children}
     </AppChrome>
   );

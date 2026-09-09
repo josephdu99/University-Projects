@@ -16,7 +16,7 @@ export default async function ProfileLayout({
     : DANCER_NAV;
 
   return (
-    <AppChrome items={items} user={{ name: user.name ?? "You" }} maxWidth={1000}>
+    <AppChrome items={items} user={{ name: user.name ?? "You", mark: user.avatarMark, color: user.avatarColor }} maxWidth={1000}>
       {children}
     </AppChrome>
   );

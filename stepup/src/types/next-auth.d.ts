@@ -5,6 +5,7 @@ declare module "next-auth" {
   interface User {
     role: Role;
     avatarEmoji: string;
+    avatarMark: string | null;
     avatarColor: string;
     timezone: string;
     verified: boolean;
@@ -15,6 +16,7 @@ declare module "next-auth" {
       id: string;
       role: Role;
       avatarEmoji: string;
+      avatarMark: string | null;
       avatarColor: string;
       timezone: string;
       verified: boolean;
@@ -27,6 +29,7 @@ declare module "next-auth/jwt" {
     id: string;
     role: Role;
     avatarEmoji: string;
+    avatarMark: string | null;
     avatarColor: string;
     timezone: string;
     verified: boolean;

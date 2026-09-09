@@ -31,6 +31,9 @@ model User {
   timezone     String    @default("Australia/Sydney")
   avatarEmoji  String    @default("🕺")
   avatarColor  String    @default("#FC5200")
+  // Independent instructors use a line-art mark on a coloured disc instead
+  // of initials or an emoji. Null for everyone else, who keep initials.
+  avatarMark   String?
 
   // Leaderboards are opt-in, not opt-out: a dancer is only ever listed once
   // they have chosen to appear. Defaulting this to true would make the

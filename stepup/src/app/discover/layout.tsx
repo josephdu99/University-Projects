@@ -8,7 +8,7 @@ export default async function DiscoverLayout({
 }) {
   const user = await requireRole("STUDENT");
   return (
-    <AppChrome items={DANCER_NAV} user={{ name: user.name ?? "You" }}>
+    <AppChrome items={DANCER_NAV} user={{ name: user.name ?? "You", mark: user.avatarMark, color: user.avatarColor }}>
       {children}
     </AppChrome>
   );

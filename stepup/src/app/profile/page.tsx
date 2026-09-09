@@ -14,6 +14,7 @@ import { DEFAULT_AVATAR_COLOR } from "@/lib/avatar-colors";
 import { PayoutPanel } from "@/components/PayoutPanel";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { Avatar } from "@/components/ui/Avatar";
+import { AvatarMark } from "@/components/ui/AvatarMark";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Tag } from "@/components/ui/Pill";
@@ -221,7 +222,16 @@ export default async function ProfilePage() {
       <VerifyBanner verified={sessionUser.verified} />
 
       <Card className="flex items-center gap-4 p-5">
-        <Avatar emoji={user.avatarEmoji} color={user.avatarColor} size="xl" />
+        {user.role === "INSTRUCTOR" ? (
+          <AvatarMark
+            name={user.name}
+            mark={user.avatarMark}
+            color={user.avatarColor}
+            size={72}
+          />
+        ) : (
+          <Avatar emoji={user.avatarEmoji} color={user.avatarColor} size="xl" />
+        )}
         <div>
           <h1 className="text-xl font-extrabold text-ink">{user.name}</h1>
           <p className="text-sm text-ink-soft">{ROLE_LABEL[user.role as Role]}</p>
@@ -255,8 +265,10 @@ export default async function ProfilePage() {
           timezone: user.timezone,
           avatarEmoji: user.avatarEmoji,
           avatarColor: user.avatarColor,
+          avatarMark: user.avatarMark,
         }}
         showBio={user.role === "INSTRUCTOR"}
+        useMark={user.role === "INSTRUCTOR"}
       />
 
       {/* The dashboard's payout nudge disappears once payouts are connected,

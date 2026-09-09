@@ -10,6 +10,7 @@ import { requireUser } from "@/lib/session";
 import { SIGNUP_ROLES } from "@/lib/roles";
 import { isValidTimeZone, DEFAULT_TIMEZONE } from "@/lib/time";
 import { AVATAR_COLORS, isAvatarColor } from "@/lib/avatar-colors";
+import { isAvatarMark } from "@/lib/avatar-marks";
 import { issueToken, verifyToken, consumeToken, TOKEN_PURPOSE } from "@/lib/tokens";
 import { sendVerificationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -298,6 +299,8 @@ const profileSchema = z.object({
   // left untouched when absent rather than being cleared.
   avatarEmoji: z.string().trim().min(1).max(8).optional(),
   avatarColor: z.string().refine(isAvatarColor, "Pick a valid colour"),
+  // Instructors only. Absent for everyone else, who keep initials.
+  avatarMark: z.string().refine(isAvatarMark, "Pick a valid mark").optional(),
 });
 
 export async function updateProfileAction(
@@ -320,6 +323,7 @@ export async function updateProfileAction(
       bio: parsed.data.bio || null,
       timezone: parsed.data.timezone,
       ...(parsed.data.avatarEmoji ? { avatarEmoji: parsed.data.avatarEmoji } : {}),
+      ...(parsed.data.avatarMark ? { avatarMark: parsed.data.avatarMark } : {}),
       avatarColor: parsed.data.avatarColor,
     },
   });

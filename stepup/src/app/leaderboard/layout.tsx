@@ -15,7 +15,7 @@ export default async function LeaderboardLayout({
   return (
     <AppChrome
       items={DANCER_NAV}
-      user={{ name: user.name ?? "You" }}
+      user={{ name: user.name ?? "You", mark: user.avatarMark, color: user.avatarColor }}
       maxWidth={1000}
     >
       {children}

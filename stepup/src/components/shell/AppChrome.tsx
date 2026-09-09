@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { C, DISPLAY, marketingFontClass } from "@/lib/marketing-theme";
-import { initialsOf } from "@/lib/style-chips";
+import { AvatarMark } from "@/components/ui/AvatarMark";
 import { NavLink } from "./NavLink";
 
 export type NavItem = { href: string; label: string; exact?: boolean };
@@ -39,7 +39,8 @@ export function AppChrome({
   children,
 }: {
   items: NavItem[];
-  user: { name: string };
+  /** `mark` and `color` let an instructor's chosen avatar follow them. */
+  user: { name: string; mark?: string | null; color?: string };
   maxWidth?: number;
   children: ReactNode;
 }) {
@@ -131,25 +132,12 @@ export function AppChrome({
               </button>
             </form>
           </div>
-          <div
-            aria-hidden
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 999,
-              background: C.brand,
-              color: C.onBrand,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: DISPLAY,
-              fontWeight: 700,
-              fontSize: 15,
-              flex: "none",
-            }}
-          >
-            {initialsOf(user.name)}
-          </div>
+          <AvatarMark
+            name={user.name}
+            mark={user.mark}
+            color={user.color ?? C.brand}
+            size={38}
+          />
         </div>
       </header>
 

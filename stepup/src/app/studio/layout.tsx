@@ -8,7 +8,7 @@ export default async function StudioLayout({
 }) {
   const user = await requireRole("STUDIO_OWNER");
   return (
-    <AppChrome items={hostNav("/studio")} user={{ name: user.name ?? "You" }}>
+    <AppChrome items={hostNav("/studio")} user={{ name: user.name ?? "You", mark: user.avatarMark, color: user.avatarColor }}>
       {children}
     </AppChrome>
   );

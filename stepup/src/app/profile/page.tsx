@@ -2,14 +2,15 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { ROLE_LABEL, isHost, type Role } from "@/lib/roles";
 import { getDancerProfile } from "@/lib/dancer-profile";
-import { getStudioProfile } from "@/lib/studio-profile";
-import { StudioProfileHeader } from "@/components/host/StudioProfile";
+import { getHostProfile } from "@/lib/host-profile";
+import { HostProfileHeader } from "@/components/host/HostProfileHeader";
 import {
   HostPasswordCard,
   HostProfileCard,
+  InstructorProfileCard,
   PayoutsCard,
   StudioDetailsCard,
-} from "@/components/host/StudioProfileForms";
+} from "@/components/host/HostProfileForms";
 import { DEFAULT_AVATAR_COLOR } from "@/lib/avatar-colors";
 import { PayoutPanel } from "@/components/PayoutPanel";
 import { logoutAction } from "@/lib/actions/auth-actions";
@@ -107,10 +108,11 @@ export default async function ProfilePage() {
     (earnings._sum.amountCents ?? 0) - (earnings._sum.feeCents ?? 0);
 
   if (user.role === "STUDIO_OWNER" && user.studio) {
-    const data = await getStudioProfile({
+    const data = await getHostProfile({
       id: user.id,
       timezone: user.timezone,
       payoutsActive: Boolean(payout?.chargesEnabled && payout?.payoutsEnabled),
+      kind: "studio",
     });
 
     return (
@@ -121,11 +123,11 @@ export default async function ProfilePage() {
           </div>
         )}
 
-        <StudioProfileHeader
+        <HostProfileHeader
           name={user.name}
           role={ROLE_LABEL[user.role as Role]}
-          city={user.homeCity}
-          studioName={user.studio.name}
+          place={user.homeCity}
+          subject={user.studio.name}
           avatarColor={user.avatarColor || DEFAULT_AVATAR_COLOR}
           verified={Boolean(user.emailVerifiedAt)}
           data={data}
@@ -216,7 +218,116 @@ export default async function ProfilePage() {
     );
   }
 
-  // ── Instructors and admins keep the existing profile ──────────────────────
+  if (user.role === "INSTRUCTOR") {
+    const data = await getHostProfile({
+      id: user.id,
+      timezone: user.timezone,
+      payoutsActive: Boolean(payout?.chargesEnabled && payout?.payoutsEnabled),
+      kind: "instructor",
+    });
+
+    // The one style they teach, when there is exactly one, reads better in
+    // the identity line than a count does.
+    const styleStat = data.stats.find((s) => s.label === "Style");
+
+    return (
+      <div>
+        {!user.emailVerifiedAt && (
+          <div style={{ marginBottom: 16 }}>
+            <VerifyBanner verified={false} />
+          </div>
+        )}
+
+        <HostProfileHeader
+          name={user.name}
+          role={ROLE_LABEL[user.role as Role]}
+          place="Teaching online"
+          placeIcon="globe"
+          subject={styleStat?.value ?? null}
+          avatarColor={user.avatarColor || DEFAULT_AVATAR_COLOR}
+          avatarMark={user.avatarMark}
+          verified={Boolean(user.emailVerifiedAt)}
+          data={data}
+        />
+
+        <PayoutsCard
+          status={payout?.status ?? null}
+          chargesEnabled={payout?.chargesEnabled ?? false}
+          payoutsEnabled={payout?.payoutsEnabled ?? false}
+          netEarningsCents={netEarningsCents}
+        />
+
+        <InstructorProfileCard
+          defaults={{
+            name: user.name,
+            displayName: user.displayName ?? "",
+            bio: user.bio ?? "",
+            homeCity: user.homeCity ?? "",
+            timezone: user.timezone,
+            avatarColor: user.avatarColor || DEFAULT_AVATAR_COLOR,
+            avatarMark: user.avatarMark,
+          }}
+        />
+
+        <HostPasswordCard />
+
+        <section
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            padding: "24px clamp(22px, 4vw, 36px)",
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderRadius: 24,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                color: C.label,
+                marginBottom: 6,
+              }}
+            >
+              Account email
+            </div>
+            {/* No "Change email" button: there is no such flow, and adding one
+                needs re-verification plus a way back if the new address is
+                wrong. */}
+            <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 17 }}>
+              {user.email}
+            </div>
+          </div>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              style={{
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontWeight: 600,
+                fontSize: 14.5,
+                padding: "11px 22px",
+                borderRadius: 999,
+                background: "none",
+                border: "1.5px solid oklch(89% 0.012 70)",
+                color: "oklch(30% 0.02 60)",
+              }}
+            >
+              Log out
+            </button>
+          </form>
+        </section>
+      </div>
+    );
+  }
+
+  // ── Admins keep the existing profile ──────────────────────────────────────
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
       <VerifyBanner verified={sessionUser.verified} />

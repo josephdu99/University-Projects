@@ -2,41 +2,49 @@ import { db } from "@/lib/db";
 import { isoWeekKeyInTimeZone, monthBoundsInTimeZone } from "@/lib/time";
 
 /**
- * What a studio owner's profile can say about their studio.
+ * What a host's profile can say about their teaching, for both a studio owner
+ * and an independent instructor. The two pages are the same shape; only the
+ * stage names and a little copy differ.
  *
  * Same rule as the dancer profile: every figure comes from classes that were
- * actually hosted and bookings that were actually made. The design's
- * "filling reliably" is a judgement, so the copy states the measured fill
- * rate instead and lets the owner draw the conclusion.
+ * actually hosted and bookings that were actually made. Where a design asks
+ * for a judgement the app cannot make, the copy states the measured number
+ * and lets the host draw the conclusion.
  */
+
+export type HostKind = "studio" | "instructor";
 
 export type Stage = { label: string; state: "done" | "current" | "todo" };
 
-export type StudioStat = {
+export type HostStat = {
   label: string;
   value: string;
   unit: string;
   note: string;
 };
 
-export type StudioProfileData = {
+export type HostProfileData = {
   stages: Stage[];
   headline: string;
   note: string;
   weeks: boolean[];
   weeksLine: string;
-  stats: StudioStat[];
+  stats: HostStat[];
   /** Month and year the first class was hosted, e.g. "January 2026". */
   hostingSince: string | null;
 };
 
-const STAGES = ["New studio", "Free classes", "Paid workshops"] as const;
+const STAGES: Record<HostKind, readonly [string, string, string]> = {
+  studio: ["New studio", "Free classes", "Paid workshops"],
+  instructor: ["New instructor", "Free classes", "Paid sessions"],
+};
 
-export async function getStudioProfile(host: {
+export async function getHostProfile(host: {
   id: string;
   timezone: string;
   payoutsActive: boolean;
-}): Promise<StudioProfileData> {
+  kind: HostKind;
+}): Promise<HostProfileData> {
   const now = new Date();
 
   const classes = await db.danceClass.findMany({
@@ -83,7 +91,7 @@ export async function getStudioProfile(host: {
   const stageIndex =
     host.payoutsActive && hasPaid ? 2 : held.length > 0 ? 1 : 0;
 
-  const stages: Stage[] = STAGES.map((label, i) => ({
+  const stages: Stage[] = STAGES[host.kind].map((label, i) => ({
     label,
     state: i === stageIndex ? "current" : i < stageIndex ? "done" : "todo",
   }));
@@ -101,11 +109,7 @@ export async function getStudioProfile(host: {
 
   return {
     stages,
-    headline: [
-      "You have not hosted a class yet.",
-      "You're running free classes.",
-      "You're running paid classes.",
-    ][stageIndex],
+    headline: headlineFor(host.kind, stageIndex, held.length),
     note: noteFor(stageIndex, held.length, fill, host.payoutsActive),
     weeks,
     weeksLine: `You hosted a class in ${active} of your last ${weeks.length} weeks.`,
@@ -135,12 +139,21 @@ export async function getStudioProfile(host: {
             ? "Once a class has run this fills in"
             : `Across your last ${recent.length === 1 ? "class" : `${recent.length} classes`}`,
       },
-      {
-        label: "Styles offered",
-        value: String(styles.length),
-        unit: styles.length === 1 ? "style" : "styles",
-        note: styles.length ? listOf(styles) : "Nothing listed yet",
-      },
+      // An instructor usually teaches one thing, so naming it says more than
+      // counting it. A studio offering several is better described by a count.
+      styles.length === 1
+        ? {
+            label: "Style",
+            value: styles[0],
+            unit: "",
+            note: "Add another when you teach it",
+          }
+        : {
+            label: host.kind === "studio" ? "Styles offered" : "Styles taught",
+            value: String(styles.length),
+            unit: "styles",
+            note: styles.length ? listOf(styles) : "Nothing listed yet",
+          },
     ],
     hostingSince: held.length ? monthYear(held[0].startTime, host.timezone) : null,
   };
@@ -154,6 +167,21 @@ function averageFill(
   if (seats === 0) return null;
   const taken = classes.reduce((sum, c) => sum + c.bookings.length, 0);
   return Math.round((taken / seats) * 100);
+}
+
+function headlineFor(kind: HostKind, stage: number, hosted: number) {
+  if (stage === 0) {
+    return kind === "studio"
+      ? "You have not hosted a class yet."
+      : "You have not taught a class yet.";
+  }
+  if (stage === 1) {
+    // The design's "Two classes in. Keep going." only reads right early on.
+    return hosted <= 3 && kind === "instructor"
+      ? `${hosted} ${hosted === 1 ? "class" : "classes"} in. Keep going.`
+      : "You're running free classes.";
+  }
+  return "You're running paid classes.";
 }
 
 function noteFor(

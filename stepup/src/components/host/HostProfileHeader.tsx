@@ -1,26 +1,37 @@
 import { C, DISPLAY } from "@/lib/marketing-theme";
-import { initialsOf } from "@/lib/style-chips";
-import type { StudioProfileData } from "@/lib/studio-profile";
+import type { HostProfileData } from "@/lib/host-profile";
+import { AvatarMark } from "@/components/ui/AvatarMark";
 
-/** The read-only half of a studio owner's profile. */
-export function StudioProfileHeader({
+/** The read-only half of a host's profile: studio owner or instructor. */
+export function HostProfileHeader({
   name,
   role,
-  city,
-  studioName,
+  place,
+  placeIcon = "pin",
+  subject,
   avatarColor,
+  avatarMark,
   verified,
   data,
 }: {
   name: string;
   role: string;
-  city: string | null;
-  studioName: string | null;
+  /** City for a studio, "Teaching online" for an instructor. */
+  place: string | null;
+  placeIcon?: "pin" | "globe";
+  /** Studio name, or the style an instructor teaches. */
+  subject: string | null;
   avatarColor: string;
+  avatarMark?: string | null;
   verified: boolean;
-  data: StudioProfileData;
+  data: HostProfileData;
 }) {
-  const since = [studioName, data.hostingSince && `hosting since ${data.hostingSince}`]
+  const eyebrow = placeIcon === "globe" ? "WHERE YOU ARE" : "WHERE YOUR STUDIO IS";
+  const since = [
+    subject,
+    data.hostingSince &&
+      `${placeIcon === "globe" ? "teaching" : "hosting"} since ${data.hostingSince}`,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -35,26 +46,12 @@ export function StudioProfileHeader({
           marginBottom: 20,
         }}
       >
-        <div
-          aria-hidden
-          style={{
-            width: 104,
-            height: 104,
-            flex: "none",
-            borderRadius: 999,
-            background: avatarColor,
-            color: C.onBrand,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: DISPLAY,
-            fontWeight: 800,
-            fontSize: 36,
-            letterSpacing: "-0.02em",
-          }}
-        >
-          {initialsOf(name)}
-        </div>
+        <AvatarMark
+          name={name}
+          mark={avatarMark}
+          color={avatarColor}
+          size={104}
+        />
 
         <div style={{ flex: "1 1 320px" }}>
           <h1
@@ -81,7 +78,7 @@ export function StudioProfileHeader({
             >
               {role}
             </span>
-            {city && (
+            {place && (
               <span
                 style={{
                   ...tag,
@@ -89,16 +86,28 @@ export function StudioProfileHeader({
                   color: "oklch(38% 0.04 60)",
                 }}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flex: "none" }}>
-                  <path
-                    d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinejoin="round"
-                  />
-                  <circle cx="12" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.8" />
-                </svg>
-                {city}
+                {placeIcon === "globe" ? (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flex: "none" }}>
+                    <circle cx="12" cy="12" r="8.4" stroke="currentColor" strokeWidth="1.8" />
+                    <path
+                      d="M3.6 12h16.8M12 3.6c2.6 2.4 2.6 14.4 0 16.8-2.6-2.4-2.6-14.4 0-16.8z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flex: "none" }}>
+                    <path
+                      d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="12" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.8" />
+                  </svg>
+                )}
+                {place}
               </span>
             )}
             {since && (
@@ -170,7 +179,7 @@ export function StudioProfileHeader({
                 marginBottom: 14,
               }}
             >
-              WHERE YOUR STUDIO IS
+              {eyebrow}
             </div>
             <h2
               style={{
@@ -287,7 +296,7 @@ export function StudioProfileHeader({
       </section>
 
       <section
-        aria-label="Your studio in numbers"
+        aria-label="Your teaching in numbers"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",

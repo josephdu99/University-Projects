@@ -15,6 +15,8 @@ import { AVATAR_COLORS } from "@/lib/avatar-colors";
 import { C, DISPLAY } from "@/lib/marketing-theme";
 import { COMMON_TIMEZONES, formatMoney } from "@/lib/time";
 import { initialsOf } from "@/lib/style-chips";
+import { AvatarMarkPicker } from "@/components/host/AvatarMarkPicker";
+import { DEFAULT_AVATAR_MARK, MARK_COLORS } from "@/lib/avatar-marks";
 
 /** The mark shown next to a studio's name in listings. */
 const STUDIO_BADGES = ["🎵", "🕺", "🔥", "✨", "👟", "🎧", "🌙", "🦋", "💃", "🩰"];
@@ -533,6 +535,166 @@ export function HostPasswordCard() {
         <button type="submit" style={ghostBtn}>
           Update password
         </button>
+      </form>
+    </section>
+  );
+}
+
+/**
+ * An instructor's public profile: the fields dancers see on a class, plus the
+ * avatar mark. A studio owner edits their venue separately; an instructor is
+ * the venue, so it is all one card.
+ */
+export function InstructorProfileCard({
+  defaults,
+}: {
+  defaults: {
+    name: string;
+    displayName: string;
+    bio: string;
+    homeCity: string;
+    timezone: string;
+    avatarColor: string;
+    avatarMark: string | null;
+  };
+}) {
+  const { update } = useSession();
+  const [name, setName] = useState(defaults.name);
+  const [mark, setMark] = useState(defaults.avatarMark ?? DEFAULT_AVATAR_MARK);
+  const [colour, setColour] = useState(
+    (MARK_COLORS as readonly string[]).includes(defaults.avatarColor)
+      ? defaults.avatarColor
+      : MARK_COLORS[0]
+  );
+
+  const [state, formAction] = useActionState(
+    async (prev: Awaited<ReturnType<typeof updateProfileAction>>, fd: FormData) => {
+      const result = await updateProfileAction(prev, fd);
+      // Refresh the JWT so the nav name and avatar update without a reload.
+      if (result?.success) await update();
+      return result;
+    },
+    undefined
+  );
+
+  const zones = Array.from(new Set([defaults.timezone, ...COMMON_TIMEZONES]));
+
+  return (
+    <section style={card}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        <h2 style={heading}>Public profile</h2>
+        <span style={{ fontSize: 13.5, color: C.label }}>
+          This is what dancers see on your classes
+        </span>
+      </div>
+
+      <form action={formAction}>
+        <div style={grid}>
+          <div>
+            <label style={labelStyle} htmlFor="ins-name">
+              Name
+            </label>
+            <input
+              id="ins-name"
+              name="name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={field}
+            />
+          </div>
+          <div>
+            <label style={labelStyle} htmlFor="ins-display">
+              Display name
+            </label>
+            <input
+              id="ins-display"
+              name="displayName"
+              defaultValue={defaults.displayName}
+              placeholder="e.g. Maya R. Dance"
+              style={field}
+            />
+            <p style={{ ...note, margin: "8px 0 0" }}>
+              Optional, shown instead of your name on listings.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label style={labelStyle} htmlFor="ins-bio">
+            Bio
+          </label>
+          <textarea
+            id="ins-bio"
+            name="bio"
+            rows={3}
+            defaultValue={defaults.bio}
+            style={{ ...field, resize: "vertical", lineHeight: 1.55 }}
+          />
+        </div>
+
+        <div style={{ ...grid, marginBottom: 26 }}>
+          <div>
+            <label style={labelStyle} htmlFor="ins-city">
+              City
+            </label>
+            <input
+              id="ins-city"
+              name="homeCity"
+              defaultValue={defaults.homeCity}
+              style={field}
+            />
+            <p style={{ ...note, margin: "8px 0 0" }}>
+              Use &ldquo;Online&rdquo; if you only stream.
+            </p>
+          </div>
+          <div>
+            <label style={labelStyle} htmlFor="ins-timezone">
+              Timezone
+            </label>
+            <select
+              id="ins-timezone"
+              name="timezone"
+              defaultValue={defaults.timezone}
+              style={field}
+            >
+              {zones.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+            <p style={{ ...note, margin: "8px 0 0" }}>
+              New classes use this for their local times.
+            </p>
+          </div>
+        </div>
+
+        <AvatarMarkPicker
+          name={name}
+          mark={mark}
+          color={colour}
+          onMarkChange={setMark}
+          onColorChange={setColour}
+        />
+
+        <Notice error={state?.error} success={state?.success} />
+
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+          <button type="submit" style={primaryBtn}>
+            Save changes
+          </button>
+          <span style={note}>Dancers see this on every class you host.</span>
+        </div>
       </form>
     </section>
   );

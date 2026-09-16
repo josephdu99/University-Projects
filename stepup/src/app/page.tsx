@@ -59,7 +59,7 @@ export default async function Home() {
       }}
     >
       {/* NAV */}
-      <div
+      <header
         style={{
           position: "sticky",
           top: 0,
@@ -73,16 +73,19 @@ export default async function Home() {
           borderBottom: `1px solid ${C.border}`,
         }}
       >
-        <div
+        <Link
+          href="/"
           style={{
             fontFamily: DISPLAY,
             fontWeight: 800,
             fontSize: 22,
             letterSpacing: "-0.02em",
+            color: C.ink,
+            textDecoration: "none",
           }}
         >
           StepUp
-        </div>
+        </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link
             href="/login"
@@ -111,7 +114,7 @@ export default async function Home() {
             Get started
           </Link>
         </div>
-      </div>
+      </header>
 
       {/* HERO */}
       <div

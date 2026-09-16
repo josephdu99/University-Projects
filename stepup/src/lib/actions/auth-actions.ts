@@ -127,7 +127,7 @@ export async function signUpAction(
     await signIn("credentials", {
       email: data.email,
       password: data.password,
-      redirectTo: "/",
+      redirectTo: "/go",
     });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -151,7 +151,7 @@ export async function loginAction(
   }
 
   try {
-    await signIn("credentials", { email, password, redirectTo: "/" });
+    await signIn("credentials", { email, password, redirectTo: "/go" });
   } catch (err) {
     if (err instanceof AuthError) {
       const code = (err as AuthError & { code?: string }).code ?? "";
@@ -168,7 +168,7 @@ export async function loginAction(
  * renders the button, which it does only once credentials are configured.
  */
 export async function googleLoginAction() {
-  await signIn("google", { redirectTo: "/" });
+  await signIn("google", { redirectTo: "/go" });
 }
 
 export async function logoutAction() {

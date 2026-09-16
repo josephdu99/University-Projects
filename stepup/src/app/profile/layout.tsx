@@ -1,5 +1,4 @@
 import { requireUser } from "@/lib/session";
-import { ROLE_HOME } from "@/lib/roles";
 import { AppChrome, DANCER_NAV, hostNav } from "@/components/shell/AppChrome";
 
 export default async function ProfileLayout({
@@ -17,14 +16,7 @@ export default async function ProfileLayout({
     : DANCER_NAV;
 
   return (
-    <AppChrome
-      items={items}
-      user={{ name: user.name ?? "You", mark: user.avatarMark, color: user.avatarColor }}
-      // An admin sees the dancer nav here, so the first nav item is not their
-      // home, their role's is.
-      home={ROLE_HOME[user.role]}
-      maxWidth={1000}
-    >
+    <AppChrome items={items} user={{ name: user.name ?? "You", mark: user.avatarMark, color: user.avatarColor }} maxWidth={1000}>
       {children}
     </AppChrome>
   );

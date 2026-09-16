@@ -17,6 +17,18 @@ export const ROLE_HOME: Record<Role, string> = {
   ADMIN: "/admin",
 };
 
+/**
+ * What to call the place `ROLE_HOME` leads to, for links that point a signed-in
+ * user back into the app. Matches the first item of each nav so the button and
+ * the tab a click lands on carry the same word.
+ */
+export const SECTION_LABEL: Record<Role, string> = {
+  STUDENT: "Discover",
+  STUDIO_OWNER: "Studio",
+  INSTRUCTOR: "Teaching",
+  ADMIN: "Admin",
+};
+
 /** Roles that can host classes and therefore need a payout account. */
 export const HOST_ROLES: Role[] = ["STUDIO_OWNER", "INSTRUCTOR"];
 

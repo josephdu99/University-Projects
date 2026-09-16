@@ -35,26 +35,15 @@ export const DANCER_NAV: NavItem[] = [
 export function AppChrome({
   items,
   user,
-  home,
   maxWidth = 1120,
   children,
 }: {
   items: NavItem[];
   /** `mark` and `color` let an instructor's chosen avatar follow them. */
   user: { name: string; mark?: string | null; color?: string };
-  /**
-   * Where the wordmark goes. Defaults to the section root, which is what the
-   * first nav item is in both navs. Pass it explicitly wherever the nav on
-   * screen is not the viewer's own, `/profile` shows an admin the dancer nav.
-   */
-  home?: string;
   maxWidth?: number;
   children: ReactNode;
 }) {
-  // The wordmark is the usual "take me home" target, and for a signed-in user
-  // home is their own section, not the marketing page. `/` would land there
-  // too, but only by bouncing through the redirect in `app/page.tsx`.
-  const homeHref = home ?? items[0]?.href ?? "/";
   return (
     <div
       className={marketingFontClass}
@@ -93,7 +82,7 @@ export function AppChrome({
           }}
         >
           <Link
-            href={homeHref}
+            href="/"
             style={{
               fontFamily: DISPLAY,
               fontWeight: 800,

@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
-import { ROLE_HOME } from "@/lib/roles";
+import { ROLE_HOME, SECTION_LABEL } from "@/lib/roles";
 import { C, DISPLAY, marketingFontClass } from "@/lib/marketing-theme";
 import { TESTIMONIALS } from "@/lib/marketing-content";
 import { PLATFORM_FEE_PERCENT } from "@/lib/stripe";
@@ -24,7 +23,14 @@ export const metadata = {
 
 export default async function Home() {
   const user = await getSessionUser();
-  if (user) redirect(ROLE_HOME[user.role]);
+
+  // Signed in or not, everybody gets the marketing page here, it is what the
+  // wordmark points at from every shell. Only the calls to action change: no
+  // point offering "Get started, it's free" to somebody who already has an
+  // account. Signing in routes through `/go` instead, which is what used to
+  // happen here.
+  const home = user ? ROLE_HOME[user.role] : null;
+  const homeLabel = user ? SECTION_LABEL[user.role] : null;
 
   // Headline figures come from the database rather than being hard-coded, so
   // the page never overstates how much is actually on the platform.
@@ -87,32 +93,51 @@ export default async function Home() {
           StepUp
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link
-            href="/login"
-            style={{
-              fontWeight: 600,
-              fontSize: 15,
-              padding: "10px 18px",
-              color: C.ink,
-              textDecoration: "none",
-            }}
-          >
-            Log in
-          </Link>
-          <Link
-            href="/signup"
-            style={{
-              fontWeight: 700,
-              fontSize: 15,
-              padding: "10px 22px",
-              borderRadius: 999,
-              background: C.brand,
-              color: C.onBrand,
-              textDecoration: "none",
-            }}
-          >
-            Get started
-          </Link>
+          {home ? (
+            <Link
+              href={home}
+              style={{
+                fontWeight: 700,
+                fontSize: 15,
+                padding: "10px 22px",
+                borderRadius: 999,
+                background: C.brand,
+                color: C.onBrand,
+                textDecoration: "none",
+              }}
+            >
+              Back to {homeLabel}
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                style={{
+                  fontWeight: 600,
+                  fontSize: 15,
+                  padding: "10px 18px",
+                  color: C.ink,
+                  textDecoration: "none",
+                }}
+              >
+                Log in
+              </Link>
+              <Link
+                href="/signup"
+                style={{
+                  fontWeight: 700,
+                  fontSize: 15,
+                  padding: "10px 22px",
+                  borderRadius: 999,
+                  background: C.brand,
+                  color: C.onBrand,
+                  textDecoration: "none",
+                }}
+              >
+                Get started
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -176,7 +201,7 @@ export default async function Home() {
             }}
           >
             <Link
-              href="/signup"
+              href={home ?? "/signup"}
               style={{
                 fontWeight: 700,
                 fontSize: 16,
@@ -187,7 +212,7 @@ export default async function Home() {
                 textDecoration: "none",
               }}
             >
-              Get started, it&apos;s free
+              {home ? `Back to ${homeLabel}` : "Get started, it's free"}
             </Link>
             <Link
               href="/discover"

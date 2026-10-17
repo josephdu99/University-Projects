@@ -95,43 +95,12 @@ export default async function Home() {
             position: "relative",
             background: C.heroBg,
             borderRadius: 32,
-            // Room for the nav, the wordmark behind, and the dancers standing
-            // on the bottom edge. Capped so it cannot swallow a tall screen.
-            minHeight:
-              "calc(40px + min(9vw, 144px) + min(598px, 80.5vw))",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          {/* The giant wordmark, clipped to the panel's rounded corners. */}
           <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: 32,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: 92,
-                textAlign: "center",
-                fontFamily: DISPLAY,
-                fontWeight: 800,
-                fontSize: "clamp(130px, 25vw, 400px)",
-                lineHeight: 0.82,
-                letterSpacing: "-0.05em",
-                color: C.heroCream,
-                userSelect: "none",
-              }}
-            >
-              DANCE
-            </div>
-          </div>
-
-          <div
+            className="stepup-hero-bar"
             style={{
               position: "relative",
               zIndex: 3,
@@ -236,42 +205,99 @@ export default async function Home() {
             </div>
           </div>
 
-          {/* The dancers sit over the wordmark and under the nav. */}
+          {/*
+            The stage: the giant wordmark and the dancers standing on it.
+
+            It is a sibling of the bar rather than positioned from the top of
+            the panel, which is the whole trick. The handoff placed both at a
+            fixed 92px, a number that only means "just under the nav" while the
+            nav is exactly one row tall. On a narrow phone the buttons wrap and
+            that assumption breaks, dropping them straight onto the artwork.
+            Here the stage simply starts wherever the bar ends, so the bar can
+            wrap to any height and nothing ever collides.
+          */}
           <div
             style={{
-              position: "absolute",
-              zIndex: 2,
-              left: "50%",
-              top: "calc(92px + min(9vw, 144px))",
-              transform: "translateX(-50%)",
-              width: "min(520px, 70vw)",
+              position: "relative",
+              // The dancers overhang the bottom edge by design, so the stage
+              // is their height less that overhang, measured from the word.
+              minHeight:
+                "calc(min(9vw, 144px) + min(598px, 80.5vw) - 52px)",
             }}
           >
             <div
+              aria-hidden
               style={{
                 position: "absolute",
-                left: "4%",
-                right: "8%",
-                bottom: -6,
-                height: 18,
-                borderRadius: "50%",
-                background: "oklch(22% 0.02 60 / 0.14)",
+                inset: 0,
+                // Only the bottom corners round: the top edge of the stage is
+                // inside the panel, where there is no corner to follow.
+                borderRadius: "0 0 32px 32px",
+                overflow: "hidden",
               }}
-            />
-            <Image
-              src="/hero-dancers.png"
-              alt="Silhouette of a ballroom couple dancing"
-              width={800}
-              height={920}
-              priority
-              sizes="(max-width: 760px) 70vw, 520px"
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  textAlign: "center",
+                  fontFamily: DISPLAY,
+                  fontWeight: 800,
+                  // The handoff floored this at 130px, which is wider than a
+                  // phone's panel: below about 430px the word was cut to
+                  // "DAN", reading as a bug rather than a bleed. 25vw on its
+                  // own fits at any width down to ~256px, so the floor is
+                  // dropped to a value that only guards viewports narrower
+                  // than any real phone. Nothing above 520px changes.
+                  fontSize: "clamp(72px, 25vw, 400px)",
+                  lineHeight: 0.82,
+                  letterSpacing: "-0.05em",
+                  color: C.heroCream,
+                  userSelect: "none",
+                }}
+              >
+                DANCE
+              </div>
+            </div>
+
+            <div
               style={{
-                position: "relative",
-                width: "100%",
-                height: "auto",
-                display: "block",
+                position: "absolute",
+                zIndex: 2,
+                left: "50%",
+                top: "min(9vw, 144px)",
+                transform: "translateX(-50%)",
+                width: "min(520px, 70vw)",
               }}
-            />
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  left: "4%",
+                  right: "8%",
+                  bottom: -6,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: "oklch(22% 0.02 60 / 0.14)",
+                }}
+              />
+              <Image
+                src="/hero-dancers.png"
+                alt="Silhouette of a ballroom couple dancing"
+                width={800}
+                height={920}
+                priority
+                sizes="(max-width: 760px) 70vw, 520px"
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                }}
+              />
+            </div>
           </div>
         </header>
       </div>
@@ -308,6 +334,7 @@ export default async function Home() {
         </h1>
 
         <div
+          className="stepup-band-cell"
           style={{
             display: "flex",
             justifyContent: "center",
@@ -350,6 +377,7 @@ export default async function Home() {
         </div>
 
         <div
+          className="stepup-band-cell"
           style={{
             display: "flex",
             justifyContent: "flex-end",

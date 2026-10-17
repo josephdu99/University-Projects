@@ -206,3 +206,23 @@ body {
     animation: none !important;
   }
 }
+
+/* Landing hero: the handoff laid the nav out assuming it always fits on one
+   row beside the wordmark. It doesn't on a phone, and because the giant
+   "DANCE" behind it is positioned at a fixed offset, a wrapped nav collides
+   with it. Below the width where everything fits, the section links drop out
+   (every one of them is a jump to a section further down this same page, so
+   nothing becomes unreachable) and then the log-in link follows, leaving the
+   wordmark and the primary button on one row. The !important is load-bearing:
+   the hero is styled inline, and an inline display beats a stylesheet one. */
+@media (max-width: 900px) {
+  .stepup-hero-nav {
+    display: none !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .stepup-hero-login {
+    display: none !important;
+  }
+}

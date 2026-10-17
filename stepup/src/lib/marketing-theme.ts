@@ -43,6 +43,14 @@ export const C = {
   brand: "oklch(66% 0.19 35)",
   brandHover: "oklch(58% 0.19 35)",
   onBrand: "oklch(99% 0.005 70)",
+  /**
+   * The landing hero's own coral, a shade deeper than `brand` so the giant
+   * wordmark behind the dancers reads as a tint of the panel rather than
+   * competing with the buttons sitting on it.
+   */
+  heroBg: "oklch(63% 0.17 38)",
+  /** Cream used for everything printed on the hero panel */
+  heroCream: "oklch(96% 0.025 75)",
   /** Eyebrow tag */
   tagBg: "oklch(94% 0.05 85)",
   tagInk: "oklch(38% 0.09 70)",

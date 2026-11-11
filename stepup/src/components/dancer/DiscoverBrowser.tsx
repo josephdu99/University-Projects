@@ -111,6 +111,48 @@ export function DiscoverBrowser({
         </p>
       </header>
 
+      {/* Way in to the first-timer funnel, for anybody who would rather be
+          asked three questions than filter a list themselves. */}
+      <Link
+        href="/start"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+          padding: "16px 20px",
+          marginBottom: 16,
+          borderRadius: 20,
+          background: "oklch(94% 0.045 65)",
+          color: C.ink,
+          textDecoration: "none",
+        }}
+      >
+        <span style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 17 }}>
+            Not sure where to start?
+          </span>
+          <span style={{ fontSize: 14, color: C.inkSoft }}>
+            Three questions and we&apos;ll pick a beginner-friendly class for
+            you.
+          </span>
+        </span>
+        <span
+          style={{
+            fontWeight: 700,
+            fontSize: 14,
+            padding: "10px 18px",
+            borderRadius: 999,
+            background: C.ink,
+            color: C.onDark,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Find my class →
+        </span>
+      </Link>
+
       <div
         style={{
           background: C.card,

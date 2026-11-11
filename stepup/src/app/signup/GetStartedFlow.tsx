@@ -168,7 +168,7 @@ const eyebrowStyle: React.CSSProperties = {
   marginBottom: 20,
 };
 
-export function GetStartedFlow() {
+export function GetStartedFlow({ next }: { next?: string }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [intent, setIntent] = useState<Intent | null>(null);
   const [state, formAction] = useActionState(signUpAction, undefined);
@@ -495,6 +495,9 @@ export function GetStartedFlow() {
             {/* Derived from the step 1 choice rather than asked again. */}
             <input type="hidden" name="role" value={ROLE_BY_INTENT[intent]} />
             <input type="hidden" name="timezone" value={timezone} />
+            {/* Where to land afterwards, e.g. the class the funnel was
+                booking when it asked for an account. */}
+            {next ? <input type="hidden" name="next" value={next} /> : null}
 
             <label style={labelStyle} htmlFor="su-name">
               Full name

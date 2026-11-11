@@ -25,8 +25,12 @@ export const metadata = {
  */
 const SHOW_DEMO_LOGINS = process.env.SHOW_DEMO_LOGINS === "true";
 
-export default async function LoginPage() {
-  const user = await getSessionUser();
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const [user, { next }] = await Promise.all([getSessionUser(), searchParams]);
   if (user) redirect(ROLE_HOME[user.role]);
 
   // The mockup's panel showed a live-looking "dancers logged in today" ticker
@@ -125,7 +129,7 @@ export default async function LoginPage() {
               Log in to book your next class and keep your streak going.
             </p>
 
-            <LoginForm />
+            <LoginForm next={next} />
 
             {GOOGLE_ENABLED && (
               <>

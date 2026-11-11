@@ -10,13 +10,17 @@ export const metadata = {
     "Create your StepUp account, book classes as a dancer, list a studio, or teach online.",
 };
 
-export default async function GetStartedPage() {
-  const user = await getSessionUser();
+export default async function GetStartedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const [user, { next }] = await Promise.all([getSessionUser(), searchParams]);
   if (user) redirect(ROLE_HOME[user.role]);
 
   return (
     <div className={marketingFontClass} style={{ fontFamily: BODY }}>
-      <GetStartedFlow />
+      <GetStartedFlow next={next} />
     </div>
   );
 }

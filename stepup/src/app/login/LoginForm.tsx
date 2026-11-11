@@ -25,11 +25,13 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 6,
 };
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(loginAction, undefined);
 
   return (
     <form action={formAction}>
+      {/* Where to land afterwards, e.g. the class the funnel was booking. */}
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <label style={labelStyle} htmlFor="li-email">
         Email
       </label>

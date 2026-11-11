@@ -127,7 +127,7 @@ export async function signUpAction(
     await signIn("credentials", {
       email: data.email,
       password: data.password,
-      redirectTo: "/go",
+      redirectTo: safeNext(formData.get("next")),
     });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -135,6 +135,23 @@ export async function signUpAction(
     }
     throw err;
   }
+}
+
+/**
+ * Where to send somebody after they sign in.
+ *
+ * The funnel hands a class through sign-up ("book this, then come back"), so
+ * the destination has to survive the round trip. Only a path on this site is
+ * ever accepted: anything absolute, protocol-relative or backslash-escaped is
+ * an open-redirect waiting to happen and falls back to the role dispatcher.
+ */
+function safeNext(value: FormDataEntryValue | null): string {
+  if (typeof value !== "string") return "/go";
+  const v = value.trim();
+  if (!v.startsWith("/")) return "/go";
+  if (v.startsWith("//") || v.startsWith("/\\")) return "/go";
+  if (v.includes("://") || /[\r\n]/.test(v)) return "/go";
+  return v;
 }
 
 // ─── Log in / out ────────────────────────────────────────────────────────────
@@ -151,7 +168,11 @@ export async function loginAction(
   }
 
   try {
-    await signIn("credentials", { email, password, redirectTo: "/go" });
+    await signIn("credentials", {
+      email,
+      password,
+      redirectTo: safeNext(formData.get("next")),
+    });
   } catch (err) {
     if (err instanceof AuthError) {
       const code = (err as AuthError & { code?: string }).code ?? "";

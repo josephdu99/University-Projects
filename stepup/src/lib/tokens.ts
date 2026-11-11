@@ -4,6 +4,14 @@ import { db } from "@/lib/db";
 export const TOKEN_PURPOSE = {
   EMAIL_VERIFICATION: "EMAIL_VERIFICATION",
   PASSWORD_RESET: "PASSWORD_RESET",
+  /**
+   * Lets somebody who booked as a guest see and cancel that booking without
+   * an account. Read and cancel only: it is never a session, and it cannot
+   * set a password. Claiming the account goes through the ordinary password
+   * reset, which only ever arrives by email, so possession of this link can
+   * never become possession of the account.
+   */
+  GUEST_BOOKING: "GUEST_BOOKING",
 } as const;
 
 export type TokenPurpose = (typeof TOKEN_PURPOSE)[keyof typeof TOKEN_PURPOSE];
@@ -11,6 +19,8 @@ export type TokenPurpose = (typeof TOKEN_PURPOSE)[keyof typeof TOKEN_PURPOSE];
 const TTL_MS: Record<TokenPurpose, number> = {
   EMAIL_VERIFICATION: 24 * 60 * 60 * 1000,
   PASSWORD_RESET: 60 * 60 * 1000,
+  // Long enough to still work the evening of a class booked weeks ahead.
+  GUEST_BOOKING: 60 * 24 * 60 * 60 * 1000,
 };
 
 function hashToken(token: string) {
@@ -26,9 +36,18 @@ function hashToken(token: string) {
  */
 export async function issueToken(
   userId: string,
-  purpose: TokenPurpose
+  purpose: TokenPurpose,
+  options: { replaceExisting?: boolean } = {}
 ): Promise<string> {
-  await db.authToken.deleteMany({ where: { userId, purpose, usedAt: null } });
+  // Verification and reset links are one-at-a-time: a fresh request should
+  // revoke the older one. Guest booking links are not. A guest can hold
+  // several at once, one from the confirmation and one from each reminder,
+  // and revoking on issue would mean every reminder quietly broke the link
+  // in the email before it.
+  const replaceExisting = options.replaceExisting ?? purpose !== "GUEST_BOOKING";
+  if (replaceExisting) {
+    await db.authToken.deleteMany({ where: { userId, purpose, usedAt: null } });
+  }
 
   const token = randomBytes(32).toString("base64url");
 

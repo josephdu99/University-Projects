@@ -18,7 +18,10 @@ datasource db {
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
-  passwordHash String
+  // Null for an account that has never had a password set: a guest who
+  // booked without signing up, or a Google-only sign-in. Both claim the
+  // account by setting one through the password-reset flow.
+  passwordHash String?
   name         String
   role         String
   // Public-facing name shown to dancers when it differs from the account
@@ -265,6 +268,13 @@ model Booking {
 
   // Position in the waitlist queue; null for confirmed bookings.
   waitlistPosition Int?
+
+  // When each pre-class reminder actually went out. These are the idempotency
+  // record: the cron job only picks up bookings whose stamp is still null, so
+  // a retry, an overlapping run or a redeploy cannot send the same reminder
+  // twice.
+  remindedDayBeforeAt DateTime?
+  remindedDayOfAt     DateTime?
 
   updatedAt DateTime @updatedAt
 

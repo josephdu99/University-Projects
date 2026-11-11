@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { db } from "@/lib/db";
-import { getSessionUser } from "@/lib/session";
+import { resolveBookingViewer } from "@/lib/guest-session";
 import { C } from "@/lib/marketing-theme";
 import { formatClassWhen, formatMoney } from "@/lib/time";
 import { hasStarted } from "@/lib/first-class";
@@ -28,24 +27,19 @@ export const metadata = { title: "How was it? StepUp" };
  */
 export default async function AfterClassPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
-  const { id } = await params;
-  const user = await getSessionUser();
-  if (!user) redirect(`/first-class/${id}/book`);
+  const [{ id }, { t }] = await Promise.all([params, searchParams]);
 
-  const [danceClass, booking] = await Promise.all([
+  const [danceClass, viewer] = await Promise.all([
     getPublicClass(id),
-    db.booking.findUnique({
-      where: { userId_classId: { userId: user.id, classId: id } },
-      select: { status: true },
-    }),
+    resolveBookingViewer(id, t),
   ]);
   if (!danceClass) notFound();
-  if (!booking || booking.status === "CANCELLED") {
-    redirect(`/first-class/${id}/book`);
-  }
+  if (!viewer) redirect(`/first-class/${id}/book`);
 
   const started = hasStarted(danceClass.startTime);
   const raw = await getNextOptions({
@@ -80,17 +74,19 @@ export default async function AfterClassPage({
         <Link href="/" style={{ textDecoration: "none" }}>
           <Wordmark size={18} />
         </Link>
-        <Link
-          href="/schedule"
-          style={{
-            fontWeight: 600,
-            fontSize: 14,
-            color: C.inkSoft,
-            textDecoration: "none",
-          }}
-        >
-          My classes
-        </Link>
+        {!viewer.isGuest && (
+          <Link
+            href="/schedule"
+            style={{
+              fontWeight: 600,
+              fontSize: 14,
+              color: C.inkSoft,
+              textDecoration: "none",
+            }}
+          >
+            My classes
+          </Link>
+        )}
       </div>
 
       <div
@@ -129,7 +125,7 @@ export default async function AfterClassPage({
               this is where you pick what to do next.
             </p>
             <Link
-              href={`/first-class/${id}/before`}
+              href={`/first-class/${id}/before${viewer.token ? `?t=${encodeURIComponent(viewer.token)}` : ""}`}
               style={{
                 fontWeight: 700,
                 fontSize: 15,

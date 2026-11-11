@@ -176,3 +176,83 @@ export async function sendWaitlistPromoted(params: {
     text: `You're off the waitlist for ${params.classTitle}.\n${when}\n\n${appUrl("/schedule")}`,
   });
 }
+
+/**
+ * The confirmation a guest gets, which carries the only link they have to
+ * their booking. It is read-and-cancel only, never a sign-in, so the mail
+ * also points at the ordinary sign-up if they want an account.
+ */
+export async function sendGuestBookingConfirmation(params: {
+  to: string;
+  name: string;
+  classTitle: string;
+  startTime: Date;
+  timezone: string;
+  classId: string;
+  token: string;
+}) {
+  const when = formatClassWhenLong(params.startTime, params.timezone);
+  const url = appUrl(
+    `/first-class/${params.classId}/booked?t=${encodeURIComponent(params.token)}`
+  );
+  return send({
+    to: params.to,
+    subject: `You're booked: ${params.classTitle}`,
+    html: layout(
+      "See you on the floor 💃",
+      `<p>You're booked into <strong>${params.classTitle}</strong>.</p>
+       <p><strong>${when}</strong></p>
+       <p>Keep this email. The link below is how you check the details or cancel, and it only works for this booking.</p>`,
+      { label: "View my booking", url }
+    ),
+    text: `You're booked into ${params.classTitle}.\n${when}\n\nView or cancel: ${url}`,
+  });
+}
+
+/**
+ * A pre-class reminder. One template, two moments: the evening before and
+ * the morning of. `firstTimers` is only mentioned when somebody else booked
+ * in really has never danced there, because the whole point of saying it is
+ * that it is true.
+ */
+export async function sendClassReminder(params: {
+  to: string;
+  name: string;
+  classTitle: string;
+  startTime: Date;
+  timezone: string;
+  /** Is the class on today's date, in its own timezone? */
+  today: boolean;
+  where: string | null;
+  online: boolean;
+  firstTimers: number;
+  manageUrl: string;
+}) {
+  const when = formatClassWhenLong(params.startTime, params.timezone);
+  const heading = params.today ? "Today's the day" : "Coming up soon";
+
+  const company =
+    params.firstTimers > 0
+      ? `<p>${params.firstTimers === 1 ? "Someone else booked in has" : `${params.firstTimers} others booked in have`} never danced there either.</p>`
+      : "";
+  const place = params.online
+    ? "<p>It's an online class, the joining link is on your booking.</p>"
+    : params.where
+      ? `<p><strong>${params.where}</strong></p><p>Aim to get there about ten minutes early.</p>`
+      : "";
+
+  return send({
+    to: params.to,
+    subject: `${params.today ? "Today" : "Coming up"}: ${params.classTitle}`,
+    html: layout(
+      heading,
+      `<p>${params.classTitle}</p><p><strong>${when}</strong></p>${place}${company}
+       <p>Clothes you can move in, and shoes you can turn in. Nothing else to prepare.</p>
+       <p>Can't make it? Cancel and the seat goes back to the class.</p>`,
+      { label: "See my booking", url: params.manageUrl }
+    ),
+    text: `${heading}: ${params.classTitle}\n${when}\n${
+      params.online ? "Online class." : (params.where ?? "")
+    }\n\n${params.manageUrl}`,
+  });
+}

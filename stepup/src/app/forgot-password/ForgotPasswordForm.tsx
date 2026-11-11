@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { requestPasswordResetAction } from "@/lib/actions/auth-actions";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ email }: { email?: string }) {
   const [state, formAction] = useActionState(requestPasswordResetAction, undefined);
 
   if (state?.success) {
@@ -19,6 +19,7 @@ export function ForgotPasswordForm() {
     <form action={formAction} className="mt-6 flex flex-col gap-3">
       <input
         name="email"
+        defaultValue={email}
         type="email"
         required
         autoComplete="email"

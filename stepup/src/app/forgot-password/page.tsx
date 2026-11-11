@@ -3,7 +3,13 @@ import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 export const metadata = { title: "Reset your password, StepUp" };
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string }>;
+}) {
+  // A guest arriving from their booking already told us their address.
+  const { email } = await searchParams;
   return (
     <div className="mx-auto flex min-h-full w-full max-w-sm flex-1 flex-col justify-center px-5 py-12">
       <Link
@@ -19,7 +25,7 @@ export default function ForgotPasswordPage() {
         Enter your email and we&apos;ll send you a reset link.
       </p>
 
-      <ForgotPasswordForm />
+      <ForgotPasswordForm email={email} />
 
       <p className="mt-6 text-center text-sm text-ink-soft">
         Remembered it?{" "}

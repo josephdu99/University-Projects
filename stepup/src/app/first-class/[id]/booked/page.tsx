@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { db } from "@/lib/db";
-import { getSessionUser } from "@/lib/session";
+import { resolveBookingViewer } from "@/lib/guest-session";
 import { C, DISPLAY } from "@/lib/marketing-theme";
 import { formatClassWhen, formatClassWhenLong } from "@/lib/time";
 import { getPublicClass } from "@/lib/first-class-data";
@@ -18,29 +17,26 @@ export const metadata = { title: "You're booked, StepUp" };
  */
 export default async function BookedPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
-  const { id } = await params;
-  const user = await getSessionUser();
-  if (!user) redirect(`/first-class/${id}/book`);
+  const [{ id }, { t }] = await Promise.all([params, searchParams]);
 
-  const [danceClass, booking] = await Promise.all([
+  // Either a signed-in dancer or a guest on the link we emailed them.
+  const [danceClass, viewer] = await Promise.all([
     getPublicClass(id),
-    db.booking.findUnique({
-      where: { userId_classId: { userId: user.id, classId: id } },
-      select: { status: true, waitlistPosition: true },
-    }),
+    resolveBookingViewer(id, t),
   ]);
   if (!danceClass) notFound();
-  if (!booking || booking.status === "CANCELLED") {
-    redirect(`/first-class/${id}/book`);
-  }
+  if (!viewer) redirect(`/first-class/${id}/book`);
+  const booking = viewer.booking;
 
   const waitlisted = booking.status === "WAITLISTED";
   const pending = booking.status === "PENDING_PAYMENT";
   const online = danceClass.format === "ONLINE";
-  const first = (user.name ?? "there").split(" ")[0];
+  const first = viewer.name.split(" ")[0];
   const address =
     danceClass.location ?? danceClass.studio?.address ?? null;
 
@@ -60,17 +56,19 @@ export default async function BookedPage({
         <Link href="/" style={{ textDecoration: "none" }}>
           <Wordmark size={18} />
         </Link>
-        <Link
-          href="/schedule"
-          style={{
-            fontWeight: 600,
-            fontSize: 14,
-            color: C.inkSoft,
-            textDecoration: "none",
-          }}
-        >
-          My classes
-        </Link>
+        {!viewer.isGuest && (
+          <Link
+            href="/schedule"
+            style={{
+              fontWeight: 600,
+              fontSize: 14,
+              color: C.inkSoft,
+              textDecoration: "none",
+            }}
+          >
+            My classes
+          </Link>
+        )}
       </div>
 
       <div
@@ -124,8 +122,8 @@ export default async function BookedPage({
               ? ` You're number ${booking.waitlistPosition ?? 1} in the queue, and we'll email you the moment a seat opens.`
               : pending
                 ? " Your seat is held while the payment goes through."
-                : user.email
-                  ? ` Confirmation sent to ${user.email}.`
+                : viewer.email
+                  ? ` Confirmation sent to ${viewer.email}.`
                   : ""}
           </p>
 
@@ -182,7 +180,7 @@ export default async function BookedPage({
               </span>
               <span style={{ fontSize: 15, color: "oklch(42% 0.02 60)" }}>
                 {online
-                  ? "Online class. The joining link is on your schedule."
+                  ? "Online class. The joining link is on this page nearer the time."
                   : (address ?? "Address will be confirmed by the studio.")}
               </span>
             </div>
@@ -231,14 +229,21 @@ export default async function BookedPage({
               letterSpacing: "-0.02em",
             }}
           >
-            It&apos;s all in your schedule.
+            {viewer.isGuest
+              ? "Want it in an account?"
+              : "It's all in your schedule."}
           </span>
           <span style={{ fontSize: 15, color: "oklch(80% 0.02 70)" }}>
-            Your booking, the joining details and the cancel button live in one
-            place.
+            {viewer.isGuest
+              ? "Set a password and this booking, and every one after it, lives in one place. We'll email you the link, because that's the only way we can be sure the address is yours."
+              : "Your booking, the joining details and the cancel button live in one place."}
           </span>
           <Link
-            href="/schedule"
+            href={
+              viewer.isGuest
+                ? `/forgot-password${viewer.email ? `?email=${encodeURIComponent(viewer.email)}` : ""}`
+                : "/schedule"
+            }
             style={{
               alignSelf: "flex-start",
               fontFamily: DISPLAY,
@@ -251,12 +256,12 @@ export default async function BookedPage({
               textDecoration: "none",
             }}
           >
-            Go to my classes
+            {viewer.isGuest ? "Set a password" : "Go to my classes"}
           </Link>
         </div>
 
         <Link
-          href={`/first-class/${id}/before`}
+          href={`/first-class/${id}/before${viewer.token ? `?t=${encodeURIComponent(viewer.token)}` : ""}`}
           style={{
             alignSelf: "flex-start",
             fontWeight: 700,

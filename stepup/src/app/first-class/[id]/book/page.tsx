@@ -9,6 +9,7 @@ import { formatClassWhen, formatMoney } from "@/lib/time";
 import { getPublicClass } from "@/lib/first-class-data";
 import { imageForStyle } from "@/lib/class-photo";
 import { BookForm } from "@/components/first-class/BookForm";
+import { GuestCheckoutForm } from "@/components/first-class/GuestCheckoutForm";
 import { FunnelPage, Wordmark } from "@/components/first-class/FunnelChrome";
 
 export const metadata = { title: "Book your spot, StepUp" };
@@ -16,17 +17,15 @@ export const metadata = { title: "Book your spot, StepUp" };
 /**
  * Step 5 of the funnel.
  *
- * The handoff drew this as guest checkout, "no account needed", collecting a
- * name, an email and a card on the page. The app cannot honour that: a seat
- * belongs to a User, booking is gated on the STUDENT role, and money goes
- * through Stripe Checkout on a redirect rather than a card field we host.
- * Building a real guest path would mean new schema and a second payment
- * route, which is a bigger change than a redesign.
+ * Guest checkout, as the handoff drew it: a name, an email, and the seat is
+ * yours. The booking attaches to a User created with no password, which is
+ * what lets the waitlist, check-in, roster and cancellation work for a guest
+ * exactly as for anyone else. Setting a password later turns it into a full
+ * account with the booking already in it.
  *
- * So this keeps the step and its job, confirming what you are about to book
- * and taking one action to do it, and is honest about the account. Somebody
- * signed out gets the shortest route to a seat, with the class remembered
- * across signing up so they land straight back here.
+ * The card field the handoff drew is deliberately not here. Paid classes go
+ * to Stripe Checkout on a redirect, so the card number never touches a form
+ * we host, which is worth more than the one fewer page.
  */
 export default async function BookPage({
   params,
@@ -154,43 +153,25 @@ export default async function BookPage({
 
         {!user ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <GuestCheckoutForm
+              classId={danceClass.id}
+              isFull={isFull}
+              priceLabel={priceLabel}
+              loginHref={`/login?next=${next}`}
+            />
             <div
               style={{
-                padding: "18px 20px",
-                borderRadius: 20,
-                background: "oklch(94% 0.045 65)",
                 display: "flex",
-                flexDirection: "column",
-                gap: 6,
+                alignItems: "center",
+                gap: 14,
+                fontSize: 13,
+                color: "oklch(50% 0.02 60)",
               }}
             >
-              <span
-                style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 17 }}
-              >
-                One account, so the seat is yours.
-              </span>
-              <span style={{ fontSize: 15, color: "oklch(40% 0.02 60)", textWrap: "pretty" }}>
-                A booking has to belong to someone, so the studio knows who is
-                coming and you can cancel it later. It takes about a minute, and
-                we&apos;ll bring you straight back here.
-              </span>
+              <span style={{ flex: 1, height: 1, background: "oklch(86% 0.01 70)" }} />
+              or
+              <span style={{ flex: 1, height: 1, background: "oklch(86% 0.01 70)" }} />
             </div>
-            <Link
-              href={`/signup?next=${next}`}
-              style={{
-                fontFamily: DISPLAY,
-                fontWeight: 700,
-                fontSize: 18,
-                padding: "18px 28px",
-                borderRadius: 999,
-                background: C.heroBg,
-                color: "#fff",
-                textAlign: "center",
-                textDecoration: "none",
-              }}
-            >
-              Create my account and book
-            </Link>
             <Link
               href={`/login?next=${next}`}
               style={{
@@ -204,7 +185,7 @@ export default async function BookPage({
                 textDecoration: "none",
               }}
             >
-              I already have an account
+              Log in, I already have an account
             </Link>
           </div>
         ) : user.role !== "STUDENT" ? (

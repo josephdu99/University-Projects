@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { db } from "@/lib/db";
-import { getSessionUser } from "@/lib/session";
+import { resolveBookingViewer } from "@/lib/guest-session";
 import { C, DISPLAY } from "@/lib/marketing-theme";
 import { formatClassWhenLong } from "@/lib/time";
 import { hasStarted } from "@/lib/first-class";
@@ -28,36 +27,30 @@ function countdown(startTime: Date): string {
  * Step 7: the gap between booking and turning up, which is where the handoff
  * says beginners drop out.
  *
- * The handoff answered that with three messages, an SMS the day before and
- * one from the teacher on the morning. StepUp sends neither: there is no SMS
- * anywhere in the app, and no scheduled reminder of any kind. The one message
- * that is real is the confirmation email, sent when the seat is reserved.
+ * Its answer was three messages. Two of those are now real, sent by the
+ * reminder job in `lib/reminders.ts`: one the evening before, one on the day.
+ * The third, a personal text from the teacher on the morning, is not: there
+ * is no SMS anywhere in the app and no way for a host to write one, so this
+ * page says email rather than implying a text will arrive.
  *
- * Rather than draw messages nobody receives, this is the brief itself, on a
- * page the dancer can come back to, built from the booking. Everything the
- * handoff's messages carried is here except the reassurance that somebody
- * will text you.
+ * The brief itself lives here, on a page the dancer can come back to,
+ * built from the booking.
  */
 export default async function BeforeClassPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
-  const { id } = await params;
-  const user = await getSessionUser();
-  if (!user) redirect(`/first-class/${id}/book`);
+  const [{ id }, { t }] = await Promise.all([params, searchParams]);
 
-  const [danceClass, booking] = await Promise.all([
+  const [danceClass, viewer] = await Promise.all([
     getPublicClass(id),
-    db.booking.findUnique({
-      where: { userId_classId: { userId: user.id, classId: id } },
-      select: { status: true },
-    }),
+    resolveBookingViewer(id, t),
   ]);
   if (!danceClass) notFound();
-  if (!booking || booking.status === "CANCELLED") {
-    redirect(`/first-class/${id}/book`);
-  }
+  if (!viewer) redirect(`/first-class/${id}/book`);
 
   const online = danceClass.format === "ONLINE";
   const address = danceClass.location ?? danceClass.studio?.address ?? null;
@@ -208,10 +201,10 @@ export default async function BeforeClassPage({
               textWrap: "pretty",
             }}
           >
-            One confirmation email, when you book. We don&apos;t text, and we
-            don&apos;t send reminders, so this page and your schedule are where
-            the details live. Add the class to your calendar and it will remind
-            you itself.
+            Three emails, and nothing else. Your confirmation when you book,
+            a reminder the evening before, and one on the day. We don&apos;t
+            text. Add the class to your calendar too and it will remind you
+            itself.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <a
@@ -273,7 +266,7 @@ export default async function BeforeClassPage({
 
         {started && (
           <Link
-            href={`/first-class/${id}/after`}
+            href={`/first-class/${id}/after${viewer.token ? `?t=${encodeURIComponent(viewer.token)}` : ""}`}
             style={{
               alignSelf: "flex-start",
               fontWeight: 700,

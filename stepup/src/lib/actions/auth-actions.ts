@@ -413,6 +413,17 @@ export async function changePasswordAction(
     return { error: "Too many attempts. Try again in a few minutes." };
   }
 
+  // An account that has never had a password set, a guest booking or a
+  // Google-only sign-in, has no current password to check against. Changing
+  // one is the wrong flow for them: they set their first through the reset
+  // email, which is also the only proof we have that the address is theirs.
+  if (!record.passwordHash) {
+    return {
+      error:
+        "This account doesn't have a password yet. Use “Forgot your password” to set one.",
+    };
+  }
+
   const ok = await bcrypt.compare(parsed.data.current, record.passwordHash);
   if (!ok) return { error: "Your current password isn't right." };
 

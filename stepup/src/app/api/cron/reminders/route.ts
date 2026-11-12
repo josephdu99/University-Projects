@@ -24,10 +24,15 @@ function authorized(request: Request): boolean {
 /**
  * Pre-class reminders, driven by Vercel Cron (see vercel.json).
  *
- * Hourly rather than at two fixed times, because classes run in several
- * timezones and a single daily tick would be the evening before for some
- * dancers and the middle of the night for others. The work is idempotent per
- * booking, so running often is cheap and missing a run costs nothing.
+ * Once a day, because that is all the Hobby plan allows: an hourly schedule
+ * is rejected at deploy time. The job is written for that. It decides what
+ * each class is due from the calendar, today's classes get the day-of mail
+ * and tomorrow's get the day-before one, so one run a day sends both.
+ *
+ * The schedule is 20:00 UTC, early morning across Australia, where the
+ * classes are. Hobby fires any time within that hour. The work is idempotent
+ * per booking, so calling this again by hand, or more often on a bigger
+ * plan, sends nothing twice.
  */
 export async function GET(request: Request) {
   if (!authorized(request)) {

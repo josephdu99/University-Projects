@@ -210,8 +210,8 @@ export async function sendGuestBookingConfirmation(params: {
 }
 
 /**
- * A pre-class reminder. One template, two moments: the evening before and
- * the morning of. `firstTimers` is only mentioned when somebody else booked
+ * A pre-class reminder. One template, two moments: the day before and the
+ * day itself. `firstTimers` is only mentioned when somebody else booked
  * in really has never danced there, because the whole point of saying it is
  * that it is true.
  */
@@ -221,15 +221,20 @@ export async function sendClassReminder(params: {
   classTitle: string;
   startTime: Date;
   timezone: string;
-  /** Is the class on today's date, in its own timezone? */
-  today: boolean;
+  /**
+   * Which day the class falls on, in its own timezone. The reminder job
+   * decides this off the calendar, so the wording here is true by
+   * construction rather than assumed from when the job happened to run.
+   */
+  day: "today" | "tomorrow";
   where: string | null;
   online: boolean;
   firstTimers: number;
   manageUrl: string;
 }) {
   const when = formatClassWhenLong(params.startTime, params.timezone);
-  const heading = params.today ? "Today's the day" : "Coming up soon";
+  const today = params.day === "today";
+  const heading = today ? "Today's the day" : "Tomorrow's the day";
 
   const company =
     params.firstTimers > 0
@@ -243,7 +248,7 @@ export async function sendClassReminder(params: {
 
   return send({
     to: params.to,
-    subject: `${params.today ? "Today" : "Coming up"}: ${params.classTitle}`,
+    subject: `${today ? "Today" : "Tomorrow"}: ${params.classTitle}`,
     html: layout(
       heading,
       `<p>${params.classTitle}</p><p><strong>${when}</strong></p>${place}${company}

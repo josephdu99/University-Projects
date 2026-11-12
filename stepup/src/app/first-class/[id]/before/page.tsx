@@ -28,7 +28,7 @@ function countdown(startTime: Date): string {
  * says beginners drop out.
  *
  * Its answer was three messages. Two of those are now real, sent by the
- * reminder job in `lib/reminders.ts`: one the evening before, one on the day.
+ * reminder job in `lib/reminders.ts`: one the day before, one on the day.
  * The third, a personal text from the teacher on the morning, is not: there
  * is no SMS anywhere in the app and no way for a host to write one, so this
  * page says email rather than implying a text will arrive.
@@ -202,7 +202,7 @@ export default async function BeforeClassPage({
             }}
           >
             Three emails, and nothing else. Your confirmation when you book,
-            a reminder the evening before, and one on the day. We don&apos;t
+            a reminder the day before, and one on the day. We don&apos;t
             text. Add the class to your calendar too and it will remind you
             itself.
           </p>

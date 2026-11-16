@@ -2,19 +2,31 @@ import { db } from "@/lib/db";
 import { sendClassReminder, appUrl } from "@/lib/email";
 import { issueToken, TOKEN_PURPOSE } from "@/lib/tokens";
 import { logError, logInfo } from "@/lib/logger";
-import { reminderStageFor, type ReminderStage } from "@/lib/reminder-stage";
+import {
+  classDayRelativeTo,
+  reminderStageFor,
+  type ReminderStage,
+} from "@/lib/reminder-stage";
 
 export type { ReminderStage };
 
 const SEAT_HOLDING = ["BOOKED", "ATTENDED"];
 
 /**
- * How far ahead to look for candidates. "Tomorrow", in the class's own
- * timezone, can end up to 48 hours from now, so this reaches just past that.
- * It only bounds the query; which reminder a class actually gets is decided
- * per class by `reminderStageFor`.
+ * How far ahead to look for candidates. The earliest a reminder can fall due
+ * is 6pm the evening before a class that starts just before midnight, about
+ * 30 hours ahead, so this reaches a little past that. It only bounds the
+ * query; whether a booking is actually due is decided by `reminderStageFor`.
  */
-const LOOKAHEAD_MS = 49 * 60 * 60 * 1000;
+const LOOKAHEAD_MS = 32 * 60 * 60 * 1000;
+
+/**
+ * How long one run may spend sending. The route is allowed 60 seconds and an
+ * external scheduler typically hangs up sooner, so a run stops taking on new
+ * work well before either and leaves the rest for the next call, rather than
+ * being cut off halfway through a send.
+ */
+const TIME_BUDGET_MS = 40 * 1000;
 
 /**
  * The manage link for a guest, who has no schedule to send them to.
@@ -33,6 +45,8 @@ export async function guestManageUrl(
 export type ReminderRun = {
   sent: number;
   failed: number;
+  /** Due but left for the next run because this one ran out of time. */
+  deferred: number;
   byStage: Record<ReminderStage, number>;
 };
 
@@ -68,22 +82,23 @@ async function countFirstTimers(classId: string): Promise<number> {
 /**
  * Send whichever pre-class reminders are now due.
  *
- * Built to run once a day, which is all Vercel's Hobby plan allows, and to
- * be safe at any other cadence. Each run looks at the bookings for classes
- * in the next two days and asks, per class, what today's date makes it:
- * dated today gets the day-of reminder, dated tomorrow gets the day-before
- * one. A booking made the same day therefore gets one mail, not two.
+ * Called by an external scheduler, on whatever schedule that is set to, so
+ * nothing here assumes a cadence. Each reminder has a time it falls due (see
+ * `reminderStageFor`) and is sent by the first run at or after it.
  *
- * Idempotency is the rest of the design: each booking carries a stamp per
- * stage, a stamped stage is never sent again, and the stamp is written as
- * soon as the send succeeds. A retry or a second run in the same day sends
- * nothing new, and a failed send leaves the stamp null so the next run
- * tries again.
+ * Each booking carries a stamp per reminder, and a run claims the stamp
+ * before it sends: one conditional update that only succeeds while the stamp
+ * is still empty. Two runs that overlap, a scheduler retry landing on top of
+ * a slow run, somebody calling the endpoint by hand, cannot both win that
+ * update, so they cannot both send. If the send then fails the claim is
+ * released, and the next run tries again.
  */
 export async function sendDueReminders(now = new Date()): Promise<ReminderRun> {
+  const startedAt = Date.now();
   const run: ReminderRun = {
     sent: 0,
     failed: 0,
+    deferred: 0,
     byStage: { "day-before": 0, "day-of": 0 },
   };
 
@@ -105,6 +120,7 @@ export async function sendDueReminders(now = new Date()): Promise<ReminderRun> {
     select: {
       id: true,
       userId: true,
+      bookedAt: true,
       remindedDayBeforeAt: true,
       remindedDayOfAt: true,
       user: { select: { email: true, name: true, passwordHash: true } },
@@ -128,16 +144,30 @@ export async function sendDueReminders(now = new Date()): Promise<ReminderRun> {
   for (const booking of candidates) {
     if (!booking.user.email) continue;
 
-    const stage = reminderStageFor(
-      booking.class.startTime,
-      booking.class.timezone,
+    const stage = reminderStageFor({
+      startTime: booking.class.startTime,
+      timezone: booking.class.timezone,
+      bookedAt: booking.bookedAt,
       now,
-    );
+    });
     if (!stage) continue;
 
     const stampField =
       stage === "day-before" ? "remindedDayBeforeAt" : "remindedDayOfAt";
     if (booking[stampField]) continue;
+
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      run.deferred++;
+      continue;
+    }
+
+    // Claim before sending. Only one run can turn an empty stamp into a
+    // full one, so only one run sends.
+    const claim = await db.booking.updateMany({
+      where: { id: booking.id, [stampField]: null },
+      data: { [stampField]: new Date() },
+    });
+    if (claim.count === 0) continue;
 
     try {
       let firstTimers = firstTimersByClass.get(booking.class.id);
@@ -152,9 +182,13 @@ export async function sendDueReminders(now = new Date()): Promise<ReminderRun> {
         classTitle: booking.class.title,
         startTime: booking.class.startTime,
         timezone: booking.class.timezone,
-        // The stage is read off the calendar in the class's own timezone,
-        // so "today" and "tomorrow" in the mail are true by construction.
-        day: stage === "day-of" ? "today" : "tomorrow",
+        // Read off the calendar in the class's own timezone, so the mail
+        // never says "Tomorrow" about a class that is today.
+        day: classDayRelativeTo(
+          booking.class.startTime,
+          booking.class.timezone,
+          now,
+        ),
         online: booking.class.format === "ONLINE",
         where: booking.class.location ?? booking.class.studio?.address ?? null,
         firstTimers,
@@ -165,23 +199,27 @@ export async function sendDueReminders(now = new Date()): Promise<ReminderRun> {
           : await guestManageUrl(booking.userId, booking.class.id),
       });
 
-      await db.booking.update({
-        where: { id: booking.id },
-        data: { [stampField]: new Date() },
-      });
-
       run.sent++;
       run.byStage[stage]++;
     } catch (err) {
-      // Leave the stamp null so the next run tries again.
+      // Give the claim back so the next run tries again.
       run.failed++;
       logError("reminders.send", err, { bookingId: booking.id, stage });
+      await db.booking
+        .updateMany({
+          where: { id: booking.id },
+          data: { [stampField]: null },
+        })
+        .catch((releaseErr) =>
+          logError("reminders.release", releaseErr, { bookingId: booking.id }),
+        );
     }
   }
 
   logInfo("reminders.run", {
     sent: run.sent,
     failed: run.failed,
+    deferred: run.deferred,
     dayBefore: run.byStage["day-before"],
     dayOf: run.byStage["day-of"],
   });

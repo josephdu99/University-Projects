@@ -173,6 +173,59 @@ going to fail, it fails there — which is the whole point.
   email layer logs the message instead of delivering it, so test signups cannot
   mail real people.
 
+## Reminder emails
+
+Dancers get two reminders before a class, at 6pm the evening before and at
+9am on the day, both in the class's own timezone. (A class too early for 9am
+is reminded two hours ahead instead.) Nothing in Vercel sends them: the Hobby
+plan only allows a cron job once a day, which is too coarse for that. An
+external scheduler requests one URL on a timer, and the app works out what is
+due each time it is called.
+
+**This is the one piece of the system that is not in the repository.** If
+reminders stop, the scheduler is the first place to look.
+
+### Setting it up
+
+1. In Vercel → **Settings → Environment Variables**, add `CRON_SECRET` for
+   **Production**: any long random string (`openssl rand -hex 32`). Redeploy so
+   it takes effect. Without it the URL refuses every request, on purpose.
+2. In a scheduler outside Vercel (cron-job.org is free and does this), create
+   a job:
+
+   | Setting | Value |
+   |---|---|
+   | URL | `https://<your production domain>/api/cron/reminders` |
+   | Method | `GET` |
+   | Schedule | Every hour |
+   | Request header | `Authorization: Bearer <the CRON_SECRET value>` |
+
+   The secret goes in a header, never in the URL, where it would end up in
+   logs. On cron-job.org, headers are in the job's advanced settings.
+3. Run it once by hand from the scheduler and check the response is `200` with
+   a body like `{"ok":true,"sent":0,"failed":0,"deferred":0,…}`. A `401` means
+   the header does not match `CRON_SECRET`.
+
+Reminders are also emails, so `RESEND_API_KEY` has to be set for anything to
+arrive; without it they are only logged.
+
+### Things worth knowing about it
+
+- **Hourly is the right interval.** Each reminder goes out on the first call
+  at or after its time, so hourly means within the hour. More often gains
+  little and wakes the database every time. Less often and reminders arrive
+  late or are missed.
+- **It cannot double-send.** Each booking is claimed before its reminder goes
+  out, so a retry, two calls at once, or running it by hand sends nothing
+  twice. It is always safe to call.
+- **Late bookers are skipped deliberately.** Somebody who books after a
+  reminder was due has just had a confirmation, so they do not get that
+  reminder as well.
+- **Point it at Production only.** Preview deployments usually sit behind
+  Vercel's login, where a scheduler cannot reach them. To try it on Test, call
+  the URL yourself:
+  `curl -H "Authorization: Bearer $CRON_SECRET" https://<test url>/api/cron/reminders`
+
 ---
 
 ## Deployment log

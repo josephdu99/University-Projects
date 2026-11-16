@@ -22,17 +22,17 @@ function authorized(request: Request): boolean {
 }
 
 /**
- * Pre-class reminders, driven by Vercel Cron (see vercel.json).
+ * Pre-class reminders, called by an external scheduler.
  *
- * Once a day, because that is all the Hobby plan allows: an hourly schedule
- * is rejected at deploy time. The job is written for that. It decides what
- * each class is due from the calendar, today's classes get the day-of mail
- * and tomorrow's get the day-before one, so one run a day sends both.
+ * There is no Vercel cron: the Hobby plan only allows one run a day, which is
+ * too coarse to send "6pm the evening before" in each class's own timezone.
+ * A scheduler outside Vercel requests this URL on a timer instead, with the
+ * secret in an Authorization header. Setup is in docs/ENVIRONMENTS.md.
  *
- * The schedule is 20:00 UTC, early morning across Australia, where the
- * classes are. Hobby fires any time within that hour. The work is idempotent
- * per booking, so calling this again by hand, or more often on a bigger
- * plan, sends nothing twice.
+ * The schedule therefore lives outside this repository, so the job does not
+ * trust it. Reminders are sent by the first call at or after the time they
+ * fall due, whatever the interval, and a claim on each booking means calls
+ * that overlap or repeat send nothing twice.
  */
 export async function GET(request: Request) {
   if (!authorized(request)) {

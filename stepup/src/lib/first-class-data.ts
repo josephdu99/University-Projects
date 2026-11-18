@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import type { CandidateClass } from "@/lib/first-class";
+import { suburbFromAddress } from "@/lib/suburbs";
 
 const SEAT_HOLDING = ["BOOKED", "ATTENDED", "PENDING_PAYMENT"];
 
@@ -24,7 +25,9 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
     take: 60,
     include: {
       host: { select: { name: true, displayName: true } },
-      studio: { select: { name: true, city: true, suspendedAt: true } },
+      studio: {
+        select: { name: true, city: true, address: true, suspendedAt: true },
+      },
       bookings: {
         where: { status: { in: SEAT_HOLDING } },
         select: { userId: true },
@@ -68,8 +71,35 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
     firstTimersBooked: c.bookings.filter((b) => !veterans.has(b.userId)).length,
     studioName: c.studio?.name ?? null,
     studioCity: c.studio?.city ?? null,
+    // Online classes are in no suburb, whatever their host's studio says.
+    suburb:
+      c.format === "ONLINE"
+        ? null
+        : (suburbFromAddress(c.location) ?? suburbFromAddress(c.studio?.address))
+            ?.name ?? null,
     hostName: c.host.displayName?.trim() || c.host.name,
   }));
+}
+
+/**
+ * The suburbs that really have a studio, for the matcher's "Studio here"
+ * badge. Read off live studios' addresses, so the badge appears where a
+ * studio opens and disappears where one is suspended, instead of being a
+ * fixed list in the page.
+ */
+export async function getStudioSuburbs(): Promise<string[]> {
+  const studios = await db.studio.findMany({
+    where: { suspendedAt: null },
+    select: { address: true },
+  });
+  return [
+    ...new Set(
+      studios.flatMap((s) => {
+        const at = suburbFromAddress(s.address);
+        return at ? [at.name] : [];
+      }),
+    ),
+  ];
 }
 
 /** One class for the public detail page, with the same two counts. */

@@ -259,3 +259,39 @@ body {
     justify-content: flex-start !important;
   }
 }
+
+/* First-timer funnel: the hover states the handoff specifies. These elements
+   are styled inline, and an inline value beats a stylesheet one, so the
+   hover colours need !important to apply at all. */
+.stepup-cta-pill:hover {
+  background: oklch(57% 0.17 38) !important;
+}
+.stepup-text-link:hover {
+  color: oklch(55% 0.17 38) !important;
+}
+/* Match cards lift on hover, as in the reference. */
+.stepup-lift {
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.stepup-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 40px -22px oklch(22% 0.02 60 / 0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stepup-lift,
+  .stepup-lift:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* The funnel header needs about 357px for the logo, LOG IN and the GET
+   STARTED pill at the sizes the handoff specifies, so on the narrowest
+   phones the pill ran 17px off the screen. Below 360px the text link drops
+   out; the sign-up page it leads to links to log in, so nothing becomes
+   unreachable. */
+@media (max-width: 359px) {
+  .stepup-header-login {
+    display: none !important;
+  }
+}

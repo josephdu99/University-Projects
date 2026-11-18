@@ -76,10 +76,11 @@ export function FunnelHeader({
       <Link href="/" aria-label="StepUp home" style={{ textDecoration: "none" }}>
         <Wordmark size={compact ? 20 : 24} />
       </Link>
-      <div style={{ display: "flex", alignItems: "center", gap: "clamp(14px, 2.5vw, 28px)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "clamp(16px, 2.5vw, 28px)" }}>
         {home ? (
           <Link
             href={home}
+            className="stepup-cta-pill"
             style={{
               fontWeight: 700,
               fontSize: 12,
@@ -98,6 +99,7 @@ export function FunnelHeader({
           <>
             <Link
               href="/login"
+              className="stepup-text-link stepup-header-login"
               style={{
                 fontWeight: 700,
                 fontSize: 12,
@@ -110,6 +112,7 @@ export function FunnelHeader({
             </Link>
             <Link
               href="/signup"
+              className="stepup-cta-pill"
               style={{
                 fontWeight: 700,
                 fontSize: 12,

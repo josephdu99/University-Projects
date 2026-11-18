@@ -8,7 +8,13 @@
  */
 const STYLE_PHOTOS: { match: string[]; src: string; alt: string }[] = [
   {
-    match: ["salsa", "bachata", "reggaeton", "kizomba", "tango"],
+    // Partner styles taught in a studio, as the handoff pairs it with Bachata.
+    match: ["bachata", "kizomba", "tango"],
+    src: "/photos/intermediate-salsa.png",
+    alt: "Couples practising a partner dance in a bright studio",
+  },
+  {
+    match: ["salsa", "reggaeton"],
     src: "/photos/sdc-salsa-social.jpg",
     alt: "A couple dancing salsa at a social",
   },

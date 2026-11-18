@@ -98,6 +98,24 @@ export default async function FirstClassPage({
       <div style={{ paddingBottom: 120 }}>
         <FunnelHeader home={home} homeLabel={homeLabel} width={880} compact />
 
+        {/* Back to the matcher, which restores its answers from storage. */}
+        <div
+          style={{
+            maxWidth: 880,
+            margin: "0 auto",
+            padding: "0 clamp(20px, 5vw, 40px) 16px",
+            boxSizing: "border-box",
+          }}
+        >
+          <Link
+            href="/start"
+            className="stepup-text-link"
+            style={{ fontWeight: 600, fontSize: 15, color: C.ink, textDecoration: "none" }}
+          >
+            ← Your matches
+          </Link>
+        </div>
+
         <div
           style={{
             maxWidth: 880,
@@ -367,18 +385,6 @@ export default async function FirstClassPage({
             </div>
           )}
 
-          <Link
-            href="/start"
-            style={{
-              alignSelf: "flex-start",
-              fontWeight: 700,
-              fontSize: 15,
-              color: "oklch(55% 0.17 38)",
-              textDecoration: "none",
-            }}
-          >
-            ← Back to my matches
-          </Link>
         </div>
 
         {/* Sticky book bar, the handoff's bottom rail. */}

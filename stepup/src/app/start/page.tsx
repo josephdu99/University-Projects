@@ -1,88 +1,55 @@
-import Link from "next/link";
-import { C, DISPLAY } from "@/lib/marketing-theme";
+import { formatClassWhen, formatMoney } from "@/lib/time";
 import { answersFromParams } from "@/lib/first-class";
-import { Matcher } from "@/components/first-class/Matcher";
-import { FunnelPage, Wordmark } from "@/components/first-class/FunnelChrome";
+import { getBeginnerClasses, getStudioSuburbs } from "@/lib/first-class-data";
+import { MatchPage } from "@/components/first-class/MatchPage";
+import type { MatchCandidate } from "@/components/first-class/match-types";
+import { FunnelPage } from "@/components/first-class/FunnelChrome";
 
 export const metadata = {
   title: "Find your first class, StepUp",
   description:
-    "Three quick questions and we'll match you with a beginner-friendly dance class that fits.",
+    "Three quick questions, and beginner-friendly dance classes that fit your answers, updating as you go.",
 };
 
+type Params = { goals?: string; music?: string; where?: string; when?: string };
+
 /**
- * Step 2 of the funnel. The answers already in the URL seed the form, so
- * "Edit answers" from the results page comes back with everything still
- * filled in.
+ * Step 2 of the funnel: the questions and the matches, on one page.
+ *
+ * The server's part is the data. It loads every upcoming beginner-friendly
+ * class once, works out the labels the cards show, and hands the lot to the
+ * browser, which ranks them live as the answers change.
  */
 export default async function StartPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    goals?: string;
-    music?: string;
-    where?: string;
-    when?: string;
-  }>;
+  searchParams: Promise<Params>;
 }) {
-  const initial = answersFromParams(await searchParams);
+  const params = await searchParams;
+  const [classes, studioSuburbs] = await Promise.all([
+    getBeginnerClasses(),
+    getStudioSuburbs(),
+  ]);
+
+  const candidates: MatchCandidate[] = classes.map((c) => ({
+    ...c,
+    startTime: c.startTime.toISOString(),
+    whenLabel: formatClassWhen(c.startTime, c.timezone),
+    priceLabel: formatMoney(c.priceCents, c.currency),
+  }));
+
+  // Answers in the link, from an older results URL, seed the page once.
+  const carried = Object.values(params).some(Boolean)
+    ? answersFromParams(params)
+    : null;
 
   return (
     <FunnelPage>
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 760,
-            width: "100%",
-            margin: "0 auto",
-            padding: "20px clamp(20px, 5vw, 40px) 0",
-            boxSizing: "border-box",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Link href="/" style={{ textDecoration: "none" }}>
-            <Wordmark size={20} />
-          </Link>
-          <Link
-            href="/"
-            style={{
-              fontWeight: 600,
-              fontSize: 14,
-              color: "oklch(45% 0.02 60)",
-              textDecoration: "none",
-            }}
-          >
-            Exit
-          </Link>
-        </div>
-
-        <Matcher initial={initial} />
-
-        <div
-          style={{
-            maxWidth: 760,
-            width: "100%",
-            margin: "0 auto",
-            padding: "0 clamp(20px, 5vw, 40px) 32px",
-            boxSizing: "border-box",
-            fontSize: 13,
-            color: "oklch(50% 0.02 60)",
-          }}
-        >
-          <span style={{ fontFamily: DISPLAY, fontWeight: 700, color: C.ink }}>
-            Nothing is saved yet.
-          </span>{" "}
-          Your answers only shape the classes on the next page.
-        </div>
-      </div>
+      <MatchPage
+        candidates={candidates}
+        studioSuburbs={studioSuburbs}
+        fromUrl={carried}
+      />
     </FunnelPage>
   );
 }

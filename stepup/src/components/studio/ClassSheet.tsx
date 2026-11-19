@@ -9,10 +9,12 @@ import {
   messageClassAction,
   moveClassAction,
   removeWalkInAction,
+  type ListLink,
   type Result,
 } from "@/lib/actions/studio-admin-actions";
 import { ROLE_LABEL, type DanceRole } from "@/lib/partner-roles";
 import { CloseButton } from "./CreateClassV2";
+import { PrintButton } from "./PrintButton";
 import { useStudioPanels } from "./StudioPanels";
 
 export type SheetRosterRow = {
@@ -74,11 +76,17 @@ export function ClassSheet({
   venues,
   smsOn,
   smsNumber,
+  link = null,
+  closeHref = "/studio",
 }: {
   s: SheetProps;
   venues: { id: string; name: string; address: string }[];
   smsOn: boolean;
   smsNumber: string | null;
+  /** A teacher on their emailed link, without signing in. */
+  link?: ListLink;
+  /** Where × goes; none on a page of its own. */
+  closeHref?: string | null;
 }) {
   const router = useRouter();
   const { setToast } = useStudioPanels();
@@ -129,7 +137,7 @@ export function ClassSheet({
   }
 
   const mark = (row: SheetRosterRow, to: "ATTENDED" | "NO_SHOW") =>
-    run(() => markAttendanceAction(row.bookingId, row.status === to ? null : to));
+    run(() => markAttendanceAction(row.bookingId, row.status === to ? null : to, link));
 
   return (
     <section
@@ -157,7 +165,7 @@ export function ClassSheet({
             {s.whenLabel} · {s.venueName} · with {s.teacherName}
           </div>
         </div>
-        <CloseButton onClick={() => router.push("/studio", { scroll: false })} label="Close class" />
+        {closeHref && <CloseButton onClick={() => router.push(closeHref, { scroll: false })} label="Close class" />}
       </div>
 
       <div role="tablist" aria-label="Class tools" className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 22 }}>
@@ -265,7 +273,7 @@ export function ClassSheet({
                       style={{ marginLeft: "auto", padding: "6px 12px", fontSize: 13 }}
                       disabled={pending}
                       aria-label={`Remove walk-in ${w.name}`}
-                      onClick={() => run(() => removeWalkInAction(w.id))}
+                      onClick={() => run(() => removeWalkInAction(w.id, link))}
                     >
                       Remove
                     </button>
@@ -280,7 +288,7 @@ export function ClassSheet({
                     const fd = new FormData();
                     fd.set("name", walkName);
                     if (s.partner) fd.set("role", walkRole);
-                    run(() => addWalkInAction(s.id, fd), (r) => {
+                    run(() => addWalkInAction(s.id, fd, link), (r) => {
                       setWalkName("");
                       if (r?.ok) setToast(r.message);
                     });
@@ -334,12 +342,18 @@ export function ClassSheet({
               <div className="sd-hint">Waitlist: {s.waitOthers.join(", ")}</div>
             )}
             <div className="no-print" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <a href={`/studio/csv/roster?class=${s.id}`} className="sd-btn-ghost">
-                Export CSV
-              </a>
-              <a href={`/studio/classes/${s.id}/print`} target="_blank" rel="noopener" className="sd-btn-ghost">
-                Print sign-in sheet
-              </a>
+              {link ? (
+                <PrintButton label="Print sign-in sheet" />
+              ) : (
+                <>
+                  <a href={`/studio/csv/roster?class=${s.id}`} className="sd-btn-ghost" download>
+                    Export CSV
+                  </a>
+                  <a href={`/studio/classes/${s.id}/print`} target="_blank" rel="noopener" className="sd-btn-ghost">
+                    Print sign-in sheet
+                  </a>
+                </>
+              )}
             </div>
             <span className="sd-hint">Using your own booking system too? Keep your own list. This one only has to be quick to check.</span>
           </div>
@@ -353,7 +367,7 @@ export function ClassSheet({
               e.preventDefault();
               const fd = new FormData();
               fd.set("body", msg);
-              run(() => messageClassAction(s.id, fd), (r) => {
+              run(() => messageClassAction(s.id, fd, link), (r) => {
                 setMsg("");
                 if (r?.ok) setToast(r.message);
               });

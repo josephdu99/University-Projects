@@ -62,7 +62,7 @@ async function send(email: Email): Promise<void> {
       ...(email.unsubscribeUrl
         ? {
             headers: {
-              "List-Unsubscribe": `<${email.unsubscribeUrl}>`,
+              "List-Unsubscribe": `<${email.unsubscribeUrl.replace("/unsubscribe?", "/api/unsubscribe?")}>`,
               "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
             },
           }

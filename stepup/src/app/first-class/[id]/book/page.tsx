@@ -48,7 +48,8 @@ export default async function BookPage({
 
   const isCourse = danceClass.listing === "COURSE";
   const isTrial = danceClass.listing === "TRIAL";
-  const courseStarted = isCourse && Boolean(danceClass.series && danceClass.series.startsOn.getTime() <= Date.now());
+  const nowMs = new Date().getTime();
+  const courseStarted = isCourse && Boolean(danceClass.series && danceClass.series.startsOn.getTime() <= nowMs);
   const seatsLeft = Math.max(0, danceClass.capacity - danceClass.seatsTaken);
   // A course is enrolled in, not waitlisted.
   const isFull = seatsLeft === 0;

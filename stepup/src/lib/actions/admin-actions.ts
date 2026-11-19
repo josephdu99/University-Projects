@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { logInfo } from "@/lib/logger";
+import { DANCE_STYLES } from "@/lib/class-form";
+import { saveUploadedImage } from "@/lib/images";
 
 async function audit(
   actorId: string,
@@ -115,4 +117,37 @@ export async function adjustPointsAction(
 
   await audit(admin.id, "ADJUST_POINTS", "User", userId, `${clamped > 0 ? "+" : ""}${clamped}`);
   revalidatePath(`/admin/users/${userId}`);
+}
+
+/**
+ * The concierge profile draft: the StepUp team writes a bio, picks styles and
+ * adds photos from the studio's website and socials. Nothing goes live until
+ * the studio approves it on its Profile tab.
+ */
+export async function saveStudioDraftAction(studioId: string, formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const bio = String(formData.get("bio") ?? "").trim().slice(0, 280);
+  const styles = formData.getAll("styles").map(String).filter((x) => (DANCE_STYLES as readonly string[]).includes(x));
+  await db.studio.update({
+    where: { id: studioId },
+    data: { draftBio: bio || null, draftStyles: styles, draftPreparedAt: new Date() },
+  });
+  const photo = await saveUploadedImage(formData.get("photo"));
+  if (photo?.ok) {
+    const count = await db.studioPhoto.count({ where: { studioId } });
+    await db.studioPhoto.create({ data: { studioId, imageId: photo.id, sort: count, draft: true } });
+  }
+  await audit(admin.id, "studio.draft", "Studio", studioId);
+  revalidatePath(`/admin/studios/${studioId}`);
+  revalidatePath("/studio/profile");
+}
+
+export async function removeDraftPhotoAction(photoId: string): Promise<void> {
+  const admin = await requireAdmin();
+  const p = await db.studioPhoto.findUnique({ where: { id: photoId } });
+  if (!p || !p.draft) return;
+  await db.studioPhoto.delete({ where: { id: photoId } });
+  await db.image.delete({ where: { id: p.imageId } }).catch(() => {});
+  await audit(admin.id, "studio.draftPhotoRemoved", "Studio", p.studioId);
+  revalidatePath(`/admin/studios/${p.studioId}`);
 }

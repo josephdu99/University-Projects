@@ -109,7 +109,8 @@ export default async function FirstClassPage({
   const isCourse = danceClass.listing === "COURSE";
   const isTrial = danceClass.listing === "TRIAL";
   const tz = danceClass.timezone;
-  const courseStarted = isCourse && Boolean(danceClass.series && danceClass.series.startsOn.getTime() <= Date.now());
+  const nowMs = new Date().getTime();
+  const courseStarted = isCourse && Boolean(danceClass.series && danceClass.series.startsOn.getTime() <= nowMs);
   const coursePrice = danceClass.series?.coursePriceCents ?? 0;
   const weeks = danceClass.series?.courseWeeks ?? 0;
   const priceLine = isTrial
@@ -538,7 +539,7 @@ export default async function FirstClassPage({
                   weeks: course.courseWeeks ?? 0,
                   priceCents: course.coursePriceCents ?? 0,
                   currency: course.currency,
-                  started: course.startsOn.getTime() <= Date.now(),
+                  started: course.startsOn.getTime() <= nowMs,
                   startsLabel: dayLabel(course.startsOn),
                   nextTermLabel: nextTermLabel(course.startsOn, course.courseWeeks),
                 }}

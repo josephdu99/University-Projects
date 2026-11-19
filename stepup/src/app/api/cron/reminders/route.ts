@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { sendDueReminders } from "@/lib/reminders";
+import { runStudioJobs } from "@/lib/studio-jobs";
 import { logWarn } from "@/lib/logger";
 
 // Reminders read and write, so this must never be cached or prerendered.
@@ -41,5 +42,12 @@ export async function GET(request: Request) {
   }
 
   const run = await sendDueReminders();
-  return NextResponse.json({ ok: true, ...run });
+  // Studio admin jobs ride the same schedule: teachers' 48-hour class lists,
+  // Working With Children Check reminders, automatic pass offers and
+  // expiring offer holds.
+  const studio = await runStudioJobs().catch((err) => {
+    logWarn("cron.studioJobs.failed", { message: err instanceof Error ? err.message : String(err) });
+    return null;
+  });
+  return NextResponse.json({ ok: true, ...run, studio });
 }

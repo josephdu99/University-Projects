@@ -164,6 +164,9 @@ export default async function AdminPage({
                     {s.city} · {s.owner.name} ({s.owner.email})
                   </p>
                 </div>
+                <Link href={`/admin/studios/${s.id}`} className="text-sm font-semibold text-ink underline">
+                  Profile draft
+                </Link>
                 {s.suspendedAt ? (
                   <form action={unsuspendStudioAction.bind(null, s.id)}>
                     <SubmitButton size="sm" variant="secondary" pendingLabel="…">

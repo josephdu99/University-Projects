@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { canRunClass, getStudioAccess, studioPerms } from "@/lib/studio-access";
+import { checkClassList } from "@/lib/signed-links";
 import { setAttendance, addWalkIn, type Mark } from "@/lib/attendance";
 import { deliverPassOffer, moveClass, notifyCourseInterest, passAudience, sendToClass, venueFor } from "@/lib/studio-ops";
-import { cancelClassAction } from "@/lib/actions/class-actions";
+import { cancelClass } from "@/lib/class-cancel";
 import { studioClassProblems, studioDraftFromForm } from "@/lib/studio-class-form";
 import { createStudioClass } from "@/lib/studio-classes";
 import { DANCE_STYLES, formatClock } from "@/lib/class-form";
@@ -44,9 +45,14 @@ const str = (fd: FormData, k: string) => {
 
 // ─── Class sheet: attendance, walk-ins, messages, move, cancel ──────────────
 
-async function classForRunning(classId: string) {
-  const user = await getSessionUser();
-  if (!user) return null;
+/** A teacher's emailed class-list link: who it was sent to, until when, and its signature. */
+export type ListLink = { m: string; e: string; sig: string } | null;
+
+/**
+ * Who may run this class's list: whoever runs the studio, the teacher it's
+ * assigned to when signed in, or that teacher on the link we emailed them.
+ */
+async function classForRunning(classId: string, link: ListLink = null) {
   const c = await db.danceClass.findUnique({
     where: { id: classId },
     select: {
@@ -63,22 +69,28 @@ async function classForRunning(classId: string) {
       host: { select: { name: true, displayName: true, email: true } },
     },
   });
-  if (!c || !(await canRunClass(user, c))) return null;
-  return { user, c };
+  if (!c) return null;
+  const user = await getSessionUser();
+  if (user && (await canRunClass(user, c))) return { senderId: user.id as string | null, c };
+  if (link && c.teacherMemberId === link.m && checkClassList(classId, link.m, link.e, link.sig)) {
+    const member = await db.studioMember.findUnique({ where: { id: link.m }, select: { userId: true } });
+    return { senderId: member?.userId ?? null, c };
+  }
+  return null;
 }
 
-export async function markAttendanceAction(bookingId: string, mark: Mark): Promise<Result> {
+export async function markAttendanceAction(bookingId: string, mark: Mark, link: ListLink = null): Promise<Result> {
   const booking = await db.booking.findUnique({ where: { id: bookingId }, select: { classId: true } });
   if (!booking) return { ok: false, error: "Booking not found." };
-  const ctx = await classForRunning(booking.classId);
+  const ctx = await classForRunning(booking.classId, link);
   if (!ctx) return { ok: false, error: "You can't change this class list." };
   const r = await setAttendance(bookingId, mark);
   if (!r.ok) return { ok: false, error: r.error ?? "Couldn't save that." };
   return done("Saved.", ["/studio", `/class-list/${booking.classId}`]);
 }
 
-export async function addWalkInAction(classId: string, formData: FormData): Promise<Result> {
-  const ctx = await classForRunning(classId);
+export async function addWalkInAction(classId: string, formData: FormData, link: ListLink = null): Promise<Result> {
+  const ctx = await classForRunning(classId, link);
   if (!ctx) return { ok: false, error: "You can't change this class list." };
   const name = str(formData, "name").trim();
   const r = await addWalkIn(classId, name, str(formData, "role") || null);
@@ -89,10 +101,10 @@ export async function addWalkInAction(classId: string, formData: FormData): Prom
   );
 }
 
-export async function removeWalkInAction(walkInId: string): Promise<Result> {
+export async function removeWalkInAction(walkInId: string, link: ListLink = null): Promise<Result> {
   const w = await db.walkIn.findUnique({ where: { id: walkInId }, select: { classId: true } });
   if (!w) return { ok: false, error: "Not found." };
-  if (!(await classForRunning(w.classId))) return { ok: false, error: "You can't change this class list." };
+  if (!(await classForRunning(w.classId, link))) return { ok: false, error: "You can't change this class list." };
   await db.walkIn.delete({ where: { id: walkInId } });
   return done("Walk-in removed.", ["/studio", `/class-list/${w.classId}`]);
 }
@@ -102,15 +114,15 @@ export async function removeWalkInAction(walkInId: string): Promise<Result> {
  * up) SMS, from StepUp rather than the teacher's own number. Kept with the
  * class so managers can see what was sent.
  */
-export async function messageClassAction(classId: string, formData: FormData): Promise<Result> {
-  const ctx = await classForRunning(classId);
+export async function messageClassAction(classId: string, formData: FormData, link: ListLink = null): Promise<Result> {
+  const ctx = await classForRunning(classId, link);
   if (!ctx) return { ok: false, error: "You can't message this class." };
   const body = str(formData, "body").trim();
   if (!body) return { ok: false, error: "Write a message first." };
   if (body.length > 320) return { ok: false, error: "Keep it to 320 characters." };
   const limit = await checkRateLimit(`class-msg:${classId}`, 10, 24 * 60 * 60_000);
   if (!limit.allowed) return { ok: false, error: "That's a lot of messages for one class today." };
-  const message = await sendToClass(ctx.c, ctx.user.id, body);
+  const message = await sendToClass(ctx.c, ctx.senderId, body);
   return done(message, ["/studio", `/class-list/${classId}`]);
 }
 
@@ -124,9 +136,7 @@ export async function cancelClassFromSheetAction(classId: string, reason: string
   });
   if (!c) return { ok: false, error: "Class not found." };
   if (c.cancelledAt) return { ok: false, error: "This class is already cancelled." };
-  const fd = new FormData();
-  fd.set("reason", reason.slice(0, 120));
-  await cancelClassAction(classId, fd);
+  await cancelClass(classId, reason.trim().slice(0, 120) || undefined);
   const n = c._count.bookings;
   return done(
     n

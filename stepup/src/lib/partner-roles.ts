@@ -139,3 +139,14 @@ export function nextFromWaitlist<T extends { role: string | null }>(
   }
   return null;
 }
+
+/** A class's role limits, or null when it isn't a partner class. */
+export function roleLimitsOf(c: {
+  partnerRule: string | null;
+  leadCap: number | null;
+  followCap: number | null;
+  balanceX: number | null;
+}): RoleLimits | null {
+  if (!isPartnerRule(c.partnerRule)) return null;
+  return { rule: c.partnerRule, leadCap: c.leadCap, followCap: c.followCap, balanceX: c.balanceX };
+}

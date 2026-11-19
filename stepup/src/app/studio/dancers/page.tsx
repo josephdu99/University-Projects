@@ -40,8 +40,6 @@ export default async function StudioDancersPage() {
   return (
     <>
       <TabTitle kicker="Dancers" title="Your students are yours.">
-        {/* A file download, not a page: a plain link, so the browser saves it. */}
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href="/studio/csv/students" className="sd-btn-ghost" download>
           Export CSV
         </a>

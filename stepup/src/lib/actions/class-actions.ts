@@ -4,13 +4,14 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { verifyToken, TOKEN_PURPOSE } from "@/lib/tokens";
 import { sendSms } from "@/lib/sms";
 import { recordAttendance, type AwardedBadge } from "@/lib/gamification";
 import { reserveSeat } from "@/lib/booking";
 import { checkExtras, extrasFromForm, applyExtras } from "@/lib/booking-extras";
 import { cancelStudentBooking, notifyPromoted, spendCredit, usableCredit } from "@/lib/cancellation";
 import { cancelEnrolment, enrolInCourse } from "@/lib/enrolment";
-import { requireRole, requireUser } from "@/lib/session";
+import { getSessionUser, requireRole, requireUser } from "@/lib/session";
 import { CLASS_FORMATS, DANCE_LEVELS } from "@/lib/roles";
 import {
   zonedDateTimeToUtc,
@@ -168,8 +169,18 @@ export async function bookClassAction(
  * Pay for a place held for you: one offered off the waitlist of a paid class,
  * or a checkout you backed out of.
  */
-export async function payPendingAction(bookingId: string): Promise<void> {
-  const user = await requireUser();
+export async function payPendingAction(bookingId: string, guestToken?: string | null): Promise<void> {
+  // Signed in, or a guest on the link from their offer email.
+  const session = await getSessionUser();
+  let user: { id: string; email: string | null } | null = session ? { id: session.id, email: session.email ?? null } : null;
+  if (!user && guestToken) {
+    const check = await verifyToken(guestToken, TOKEN_PURPOSE.GUEST_BOOKING);
+    if (check.valid) {
+      const u = await db.user.findUnique({ where: { id: check.userId }, select: { id: true, email: true } });
+      user = u;
+    }
+  }
+  if (!user) redirect("/login");
   const booking = await db.booking.findUnique({
     where: { id: bookingId },
     include: {
@@ -195,8 +206,8 @@ export async function payPendingAction(bookingId: string): Promise<void> {
     currency: booking.class.currency,
     destinationAccountId: account.stripeAccountId,
     customerEmail: user.email ?? undefined,
-    successPath: `/first-class/${booking.class.id}/booked`,
-    cancelPath: `/first-class/${booking.class.id}/book`,
+    successPath: `/first-class/${booking.class.id}/booked${guestToken && !session ? `?t=${encodeURIComponent(guestToken)}` : ""}`,
+    cancelPath: `/first-class/${booking.class.id}/booked${guestToken && !session ? `?t=${encodeURIComponent(guestToken)}` : ""}`,
   });
   redirect(url);
 }
@@ -659,4 +670,29 @@ export async function cancelClassAction(
   revalidatePath("/studio");
   revalidatePath("/teach");
   revalidatePath("/schedule");
+}
+
+/**
+ * "Tell me when it opens": a course that's already started takes enrolments
+ * again next term. We email once when the studio opens its next course in
+ * this style, with a way out of further updates.
+ */
+export async function courseInterestAction(
+  studioId: string,
+  style: string,
+  email: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getSessionUser();
+  const to = (user?.email ?? email).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) || to.length > 200) return { ok: false, error: "Add your email address." };
+  const limit = await checkRateLimit(`course-interest:${to}`, 10, 60 * 60_000);
+  if (!limit.allowed) return { ok: false, error: "That's a lot of requests. Try again later." };
+  const studio = await db.studio.findUnique({ where: { id: studioId }, select: { id: true } });
+  if (!studio) return { ok: false, error: "Studio not found." };
+  await db.courseInterest.upsert({
+    where: { studioId_style_email: { studioId, style: style.slice(0, 40), email: to } },
+    create: { studioId, style: style.slice(0, 40), email: to },
+    update: { notifiedAt: null },
+  });
+  return { ok: true };
 }

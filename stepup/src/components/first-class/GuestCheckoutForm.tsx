@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { bookAsGuestAction } from "@/lib/actions/guest-actions";
 import { C, DISPLAY } from "@/lib/marketing-theme";
+import { CheckoutExtras, type CheckoutNeeds } from "./CheckoutExtras";
 
 const field: React.CSSProperties = {
   height: 56,
@@ -32,11 +33,17 @@ export function GuestCheckoutForm({
   isFull,
   priceLabel,
   loginHref,
+  cta,
+  needs,
+  policyLine,
 }: {
   classId: string;
   isFull: boolean;
   priceLabel: string;
   loginHref: string;
+  cta: string;
+  needs: CheckoutNeeds;
+  policyLine: string;
 }) {
   const [state, formAction, pending] = useActionState(
     bookAsGuestAction,
@@ -109,6 +116,8 @@ export function GuestCheckoutForm({
         </span>
       </label>
 
+      <CheckoutExtras needs={needs} />
+
       <div
         style={{
           display: "flex",
@@ -137,7 +146,7 @@ export function GuestCheckoutForm({
             ? "Booking…"
             : isFull
               ? "Join the waitlist"
-              : `Book my spot · ${priceLabel}`}
+              : `${cta} · ${priceLabel}`}
         </button>
         <div
           style={{
@@ -154,7 +163,7 @@ export function GuestCheckoutForm({
           <span style={{ fontSize: 13, color: C.inkSoft, textWrap: "pretty" }}>
             {isFull
               ? "We'll email you the moment a seat opens, and you can leave the waitlist from that email."
-              : "We'll email your confirmation with a link to cancel. You can turn it into an account afterwards if you want one."}
+              : `We'll email your confirmation with a link to cancel. ${policyLine}`}
           </span>
         </div>
       </div>

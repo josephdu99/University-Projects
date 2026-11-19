@@ -11,6 +11,13 @@ import { imageForStyle } from "@/lib/class-photo";
 import { BookForm } from "@/components/first-class/BookForm";
 import { GuestCheckoutForm } from "@/components/first-class/GuestCheckoutForm";
 import { FunnelPage, Wordmark } from "@/components/first-class/FunnelChrome";
+import type { CheckoutNeeds } from "@/components/first-class/CheckoutExtras";
+import { requirementsFor } from "@/lib/booking-extras";
+import { templateSections, termsListLabel } from "@/lib/terms-text";
+import { documentUrl } from "@/lib/documents";
+import { neededSide, roleLimitsOf } from "@/lib/partner-roles";
+import { cutoffSentence, courseCutoffSentence } from "@/lib/policy-copy";
+import { usableCredit } from "@/lib/cancellation";
 
 export const metadata = { title: "Book your spot, StepUp" };
 
@@ -39,13 +46,47 @@ export default async function BookPage({
   ]);
   if (!danceClass) notFound();
 
+  const isCourse = danceClass.listing === "COURSE";
+  const isTrial = danceClass.listing === "TRIAL";
+  const courseStarted = isCourse && Boolean(danceClass.series && danceClass.series.startsOn.getTime() <= Date.now());
   const seatsLeft = Math.max(0, danceClass.capacity - danceClass.seatsTaken);
+  // A course is enrolled in, not waitlisted.
   const isFull = seatsLeft === 0;
   const img = imageForStyle(danceClass.style);
-  const priceLabel =
-    danceClass.priceCents === 0
+  const priceCents = isCourse ? (danceClass.series?.coursePriceCents ?? 0) : danceClass.priceCents;
+  const priceLabel = isTrial
+    ? "Free trial"
+    : priceCents === 0
       ? "Free"
-      : formatMoney(danceClass.priceCents, danceClass.currency);
+      : isCourse
+        ? `${formatMoney(priceCents, danceClass.currency)} for ${danceClass.series?.courseWeeks ?? ""} weeks`
+        : formatMoney(priceCents, danceClass.currency);
+  const hostName = danceClass.studio?.name ?? danceClass.hostName;
+  const cta = isCourse ? "Enrol in the course" : isTrial ? "Book my free trial" : "Book my spot";
+  const policyLine = isCourse
+    ? courseCutoffSentence(danceClass.startTime, danceClass.timezone, danceClass.policy)
+    : cutoffSentence(danceClass.startTime, danceClass.timezone, danceClass.policy);
+
+  const req = await requirementsFor(user?.id ?? null, danceClass);
+  const limits = roleLimitsOf(danceClass);
+  const needs: CheckoutNeeds = {
+    style: danceClass.style,
+    role: req.role,
+    needed: limits && limits.rule !== "NONE" ? neededSide(danceClass.roles) : null,
+    roleRule: danceClass.partnerRule,
+    askMobile: req.mobile,
+    terms: req.terms
+      ? {
+          studioName: hostName,
+          version: req.terms.version,
+          label: termsListLabel(req.terms),
+          sections: templateSections(req.terms, danceClass.policy),
+          pdfUrl: req.terms.mode === "UPLOAD" ? documentUrl(req.terms.documentId) : null,
+        }
+      : null,
+  };
+  const credit = user && !isCourse ? await usableCredit(user.id, danceClass.hostId, priceCents) : null;
+  const creditNote = credit ? `You have ${formatMoney(credit.amountCents, danceClass.currency)} credit at ${hostName}. It pays for this class.` : null;
 
   // Already holding a seat? Go straight to the confirmation rather than
   // offering to book it twice.
@@ -151,13 +192,24 @@ export default async function BookPage({
           </span>
         </div>
 
-        {!user ? (
+        {courseStarted ? (
+          <div style={{ padding: "18px 20px", borderRadius: 20, background: "oklch(99.5% 0.004 70)", border: "1px solid oklch(88% 0.01 70)", fontSize: 15 }}>
+            This course has already started, so enrolments are closed. The class page can let you know when next term opens.
+          </div>
+        ) : isCourse && isFull ? (
+          <div style={{ padding: "18px 20px", borderRadius: 20, background: "oklch(99.5% 0.004 70)", border: "1px solid oklch(88% 0.01 70)", fontSize: 15 }}>
+            This course is full.
+          </div>
+        ) : !user ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <GuestCheckoutForm
               classId={danceClass.id}
               isFull={isFull}
               priceLabel={priceLabel}
               loginHref={`/login?next=${next}`}
+              cta={cta}
+              needs={needs}
+              policyLine={policyLine}
             />
             <div
               style={{
@@ -225,6 +277,10 @@ export default async function BookPage({
             classId={danceClass.id}
             isFull={isFull}
             priceLabel={priceLabel}
+            cta={cta}
+            needs={needs}
+            policyLine={policyLine}
+            creditNote={creditNote}
           />
         )}
 
@@ -236,9 +292,12 @@ export default async function BookPage({
             textWrap: "pretty",
           }}
         >
-          {danceClass.priceCents === 0
-            ? "This class is free, so there's nothing to pay."
+          {priceCents === 0 || creditNote
+            ? "There's nothing to pay now."
             : "Payment is taken by Stripe on the next screen. StepUp never sees your card number."}
+        </p>
+        <p style={{ margin: 0, fontSize: 13, color: "oklch(50% 0.02 60)", textWrap: "pretty" }}>
+          {`StepUp books this class for ${hostName} as its booking agent. When you book, ${hostName} gets your name, email and mobile so it can run the class and contact you directly. StepUp won't use this booking to market other studios to you.`}
         </p>
       </div>
     </FunnelPage>

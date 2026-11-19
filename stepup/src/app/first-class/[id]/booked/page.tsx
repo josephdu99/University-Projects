@@ -5,6 +5,10 @@ import { C, DISPLAY } from "@/lib/marketing-theme";
 import { formatClassWhen, formatClassWhenLong } from "@/lib/time";
 import { getPublicClass } from "@/lib/first-class-data";
 import { FunnelPage, Wordmark } from "@/components/first-class/FunnelChrome";
+import { db } from "@/lib/db";
+import { cutoffSentence, courseCutoffSentence } from "@/lib/policy-copy";
+import { payPendingAction } from "@/lib/actions/class-actions";
+import { formatInTimeZone } from "date-fns-tz";
 
 export const metadata = { title: "You're booked, StepUp" };
 
@@ -42,6 +46,26 @@ export default async function BookedPage({
   const door = [danceClass.room, danceClass.arrive ?? danceClass.studio?.arrive]
     .filter(Boolean)
     .join(". ");
+  const hostName = danceClass.studio?.name ?? danceClass.hostName;
+  const isCourse = danceClass.listing === "COURSE";
+  const accepted = danceClass.studio
+    ? await db.termsAcceptance.findFirst({
+        where: { userId: viewer.userId, studioId: danceClass.studio.id },
+        orderBy: { version: "desc" },
+        select: { version: true, acceptedAt: true },
+      })
+    : null;
+  const roleLine =
+    booking.role === "LEAD"
+      ? "You're dancing Lead."
+      : booking.role === "FOLLOW"
+        ? "You're dancing Follow."
+        : booking.role === "EITHER"
+          ? "You picked Either, so you'll dance wherever you're needed."
+          : null;
+  const policyLine = isCourse
+    ? courseCutoffSentence(danceClass.startTime, danceClass.timezone, danceClass.policy)
+    : cutoffSentence(danceClass.startTime, danceClass.timezone, danceClass.policy);
 
   return (
     <FunnelPage>
@@ -124,11 +148,69 @@ export default async function BookedPage({
             {waitlisted
               ? ` You're number ${booking.waitlistPosition ?? 1} in the queue, and we'll email you the moment a seat opens.`
               : pending
-                ? " Your seat is held while the payment goes through."
+                ? isCourse
+                  ? " Your place on the course is held while the payment goes through."
+                  : " Your seat is held while the payment goes through."
                 : viewer.email
                   ? ` Confirmation sent to ${viewer.email}.`
                   : ""}
           </p>
+
+          {pending && !booking.enrolmentId && (
+            <form action={payPendingAction.bind(null, booking.id, viewer.token)} style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 15, color: "oklch(40% 0.02 60)" }}>
+                If you&apos;ve just paid, this page updates in a moment. If not, pay now to keep your place. An offered place is held for 12 hours.
+              </span>
+              <button
+                type="submit"
+                style={{
+                  cursor: "pointer",
+                  border: 0,
+                  fontFamily: DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 17,
+                  padding: "16px 26px",
+                  borderRadius: 999,
+                  background: C.heroBg,
+                  color: "#fff",
+                }}
+              >
+                Pay and keep my place
+              </button>
+            </form>
+          )}
+
+          {!waitlisted && (
+            <div
+              style={{
+                padding: "16px 18px",
+                borderRadius: 18,
+                background: "oklch(99.5% 0.004 70)",
+                border: "1px solid oklch(88% 0.01 70)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                fontSize: 15,
+              }}
+            >
+              {roleLine && <span style={{ fontWeight: 700 }}>{roleLine}</span>}
+              <span>{policyLine}</span>
+              {accepted && (
+                <span style={{ color: "oklch(42% 0.02 60)" }}>
+                  {`You accepted ${hostName}'s terms, version ${accepted.version}, on ${formatInTimeZone(accepted.acceptedAt, danceClass.timezone, "d MMMM yyyy")}.`}
+                </span>
+              )}
+              {danceClass.studio?.healthFormUrl && (
+                <span>
+                  {`${hostName} asks new students to fill in its own health form before class. `}
+                  <a href={danceClass.studio.healthFormUrl} target="_blank" rel="noopener noreferrer" style={{ color: C.ink, fontWeight: 700 }}>
+                    Open the form
+                  </a>
+                  <span style={{ color: "oklch(42% 0.02 60)" }}> (it goes to {hostName}, not StepUp).</span>
+                </span>
+              )}
+            </div>
+          )}
 
           {!waitlisted && !pending && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>

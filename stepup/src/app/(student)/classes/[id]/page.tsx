@@ -2,8 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
-import { cancelBookingAction } from "@/lib/actions/class-actions";
-import { countSeats } from "@/lib/booking";
+import { cancelBookingAction, cancelEnrolmentAction } from "@/lib/actions/class-actions";
+import { countSeats, stepupCapacity } from "@/lib/booking";
+import { cancellationOutcome, effectivePolicy } from "@/lib/policies";
+import { cutoffSentence } from "@/lib/policy-copy";
+import { prepayRequired } from "@/lib/cancellation";
 import {
   formatClassWhenLong,
   formatDuration,
@@ -14,7 +17,6 @@ import { Tag } from "@/components/ui/Pill";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { SubmitButton } from "@/components/ui/SubmitButton";
-import { BookButton } from "@/components/classes/BookButton";
 
 export default async function ClassDetailPage({
   params,
@@ -52,12 +54,38 @@ export default async function ClassDetailPage({
     countSeats(id),
   ]);
 
-  const spotsLeft = danceClass.capacity - seats.taken;
+  const capacity = stepupCapacity(danceClass);
+  const spotsLeft = capacity - seats.taken;
+  const policy = effectivePolicy(danceClass.cancelPolicy, danceClass.studio?.cancelPolicy);
+  const bookable = danceClass.listing !== "HIDDEN" && !danceClass.kids;
   const isFull = spotsLeft <= 0;
   const isPast = danceClass.startTime < new Date();
   const isCancelled = Boolean(danceClass.cancelledAt);
   const activeBooking =
     myBooking && myBooking.status !== "CANCELLED" ? myBooking : null;
+
+  // What cancelling now would give back, so the button can say so.
+  const outcome =
+    activeBooking && activeBooking.status !== "WAITLISTED"
+      ? cancellationOutcome({
+          now: new Date(),
+          start: danceClass.startTime,
+          policy,
+          prepayRequired: await prepayRequired(user.id, danceClass.hostId),
+          movedSinceBooking: Boolean(danceClass.venueChangedAt && danceClass.venueChangedAt > activeBooking.bookedAt),
+        })
+      : null;
+  const paid = danceClass.priceCents > 0 && activeBooking?.status === "BOOKED";
+  const cancelLabel =
+    outcome === "FULL"
+      ? paid
+        ? "Cancel booking · full refund"
+        : "Cancel booking"
+      : outcome === "CREDIT"
+        ? "Cancel booking · get credit, no refund"
+        : outcome === "NONE"
+          ? "Cancel booking · no refund"
+          : "Leave waitlist";
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5">
@@ -65,9 +93,15 @@ export default async function ClassDetailPage({
         ← Back to Discover
       </Link>
 
-      {cancelled === "1" && (
-        <p className="rounded-2xl bg-surface-muted px-4 py-3 text-sm text-ink-soft">
-          Payment cancelled, your spot wasn&apos;t reserved.
+      {cancelled && (
+        <p role="status" className="rounded-2xl bg-surface-muted px-4 py-3 text-sm text-ink-soft">
+          {cancelled === "full"
+            ? "Booking cancelled. Anything you paid is on its way back to your card."
+            : cancelled === "credit"
+              ? "Booking cancelled. It was after the free cancellation cut-off, so you have credit at this studio instead of a refund. It's used automatically next time you book here."
+              : cancelled === "none"
+                ? "Booking cancelled. It was after the free cancellation cut-off, so there's nothing back this time."
+                : "Payment cancelled, your spot wasn't reserved."}
         </p>
       )}
 
@@ -122,12 +156,14 @@ export default async function ClassDetailPage({
 
         <div className="flex items-center justify-between text-sm text-ink-soft">
           <span>
-            {danceClass.capacity} spots total ·{" "}
+            {capacity} spots on StepUp ·{" "}
             <span className={isFull ? "font-medium text-red-500" : ""}>
               {isFull ? `Full (${seats.waitlisted} waiting)` : `${spotsLeft} left`}
             </span>
           </span>
         </div>
+
+        <p className="text-sm text-ink-soft">{cutoffSentence(danceClass.startTime, danceClass.timezone, policy)}</p>
 
         {isCancelled ? (
           <div className="rounded-full bg-red-50 py-2.5 text-center text-sm font-semibold text-red-600">
@@ -137,6 +173,19 @@ export default async function ClassDetailPage({
           <div className="rounded-full bg-surface-muted py-2.5 text-center text-sm font-semibold text-ink-soft">
             This class has ended
           </div>
+        ) : activeBooking?.enrolmentId ? (
+          <form action={cancelEnrolmentAction.bind(null, activeBooking.enrolmentId)}>
+            <SubmitButton variant="secondary" className="w-full" pendingLabel="Cancelling…">
+              Cancel my course enrolment
+            </SubmitButton>
+          </form>
+        ) : activeBooking?.status === "PENDING_PAYMENT" ? (
+          <Link
+            href={`/first-class/${danceClass.id}/booked`}
+            className="rounded-full bg-brand py-3 text-center text-sm font-bold text-white"
+          >
+            Pay to keep your place
+          </Link>
         ) : activeBooking ? (
           <form action={cancelBookingAction.bind(null, activeBooking.id)}>
             <SubmitButton
@@ -144,18 +193,20 @@ export default async function ClassDetailPage({
               className="w-full"
               pendingLabel="Cancelling…"
             >
-              {activeBooking.status === "WAITLISTED"
-                ? "Leave waitlist"
-                : "Cancel booking"}
+              {cancelLabel}
             </SubmitButton>
           </form>
+        ) : !bookable ? (
+          <div className="rounded-full bg-surface-muted py-2.5 text-center text-sm font-semibold text-ink-soft">
+            {danceClass.kids ? "Kids' classes are booked by a parent or guardian, which isn't open on StepUp yet." : "This class isn't booked through StepUp."}
+          </div>
         ) : (
-          <BookButton
-            classId={danceClass.id}
-            isFull={isFull}
-            size="lg"
-            label={danceClass.priceCents > 0 ? "Book & pay" : "Book this class"}
-          />
+          <Link
+            href={`/first-class/${danceClass.id}/book`}
+            className="rounded-full bg-brand py-3 text-center text-sm font-bold text-white"
+          >
+            {isFull ? "Join the waitlist" : danceClass.listing === "COURSE" ? "Enrol" : danceClass.priceCents > 0 ? "Book & pay" : "Book this class"}
+          </Link>
         )}
       </Card>
     </div>

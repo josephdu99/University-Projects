@@ -11,8 +11,11 @@ export type BookingViewer = {
   /** Set only for a guest, so pages can keep the link on their navigation. */
   token: string | null;
   booking: {
+    id: string;
     status: string;
     waitlistPosition: number | null;
+    role: string | null;
+    enrolmentId: string | null;
   };
 };
 
@@ -33,7 +36,7 @@ export async function resolveBookingViewer(
   if (session) {
     const booking = await db.booking.findUnique({
       where: { userId_classId: { userId: session.id, classId } },
-      select: { status: true, waitlistPosition: true },
+      select: { id: true, status: true, waitlistPosition: true, role: true, enrolmentId: true },
     });
     if (!booking || booking.status === "CANCELLED") return null;
     return {
@@ -58,7 +61,7 @@ export async function resolveBookingViewer(
     }),
     db.booking.findUnique({
       where: { userId_classId: { userId: check.userId, classId } },
-      select: { status: true, waitlistPosition: true },
+      select: { id: true, status: true, waitlistPosition: true, role: true, enrolmentId: true },
     }),
   ]);
 

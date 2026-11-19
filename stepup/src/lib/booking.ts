@@ -4,10 +4,8 @@ import { seatsForRegulars } from "@/lib/first-timer-spots";
 import {
   fitsRole,
   isDanceRole,
-  isPartnerRule,
   nextFromWaitlist,
   type DanceRole,
-  type RoleLimits,
 } from "@/lib/partner-roles";
 
 export type BookingOutcome =
@@ -45,15 +43,8 @@ export function stepupCapacity(c: { capacity: number; stepupSpots: number | null
   return c.stepupSpots && c.stepupSpots > 0 ? Math.min(c.capacity, c.stepupSpots) : c.capacity;
 }
 
-export function roleLimitsOf(c: {
-  partnerRule: string | null;
-  leadCap: number | null;
-  followCap: number | null;
-  balanceX: number | null;
-}): RoleLimits | null {
-  if (!isPartnerRule(c.partnerRule)) return null;
-  return { rule: c.partnerRule, leadCap: c.leadCap, followCap: c.followCap, balanceX: c.balanceX };
-}
+import { roleLimitsOf } from "@/lib/partner-roles";
+export { roleLimitsOf };
 
 const CLASS_FOR_SEATS = {
   id: true,

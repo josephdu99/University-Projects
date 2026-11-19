@@ -20,6 +20,13 @@ import {
 } from "@/components/first-class/FunnelChrome";
 import { classImage } from "@/lib/class-photo";
 import { partnerTag } from "@/lib/class-form";
+import { roleLimitsOf } from "@/lib/booking";
+import { scaleLabel } from "@/lib/levels";
+import { nextTermStart } from "@/lib/listing";
+import { cutoffLabel } from "@/lib/policy-copy";
+import { neededChip } from "@/lib/partner-roles";
+import { toFormFields } from "@/lib/time";
+import { RolesCard, PolicyCard, CourseCard } from "@/components/first-class/ClassExtras";
 
 export async function generateMetadata({
   params,
@@ -98,6 +105,48 @@ export default async function FirstClassPage({
     : [];
 
   const bookHref = `/first-class/${danceClass.id}/book`;
+  const limits = roleLimitsOf(danceClass);
+  const isCourse = danceClass.listing === "COURSE";
+  const isTrial = danceClass.listing === "TRIAL";
+  const tz = danceClass.timezone;
+  const courseStarted = isCourse && Boolean(danceClass.series && danceClass.series.startsOn.getTime() <= Date.now());
+  const coursePrice = danceClass.series?.coursePriceCents ?? 0;
+  const weeks = danceClass.series?.courseWeeks ?? 0;
+  const priceLine = isTrial
+    ? "Free trial"
+    : isCourse
+      ? `${coursePrice ? formatMoney(coursePrice, danceClass.currency).replace(/\.00$/, "") : "Free"} for ${weeks} weeks`
+      : danceClass.priceCents === 0
+        ? "Free"
+        : formatMoney(danceClass.priceCents, danceClass.currency);
+  const dayLabel = (d: Date) => formatClassWhen(d, tz).split(" · ")[0];
+  const nextTermLabel = (startsOn: Date, w: number | null) =>
+    w ? dayLabel(new Date(`${nextTermStart(toFormFields(startsOn, tz).date, w)}T12:00:00Z`)) : null;
+
+  // "Also at {studio}": the studio's course in this style (or any course),
+  // open for enrolment or running now with a next term to wait for.
+  const course =
+    danceClass.studio && !isCourse
+      ? await db.classSeries.findFirst({
+          where: {
+            studioId: danceClass.studio.id,
+            listing: "COURSE",
+            endsOn: { gte: new Date() },
+            kids: false,
+          },
+          orderBy: [{ startsOn: "asc" }],
+          select: {
+            id: true,
+            title: true,
+            style: true,
+            startsOn: true,
+            courseWeeks: true,
+            coursePriceCents: true,
+            currency: true,
+            sessions: { where: { cancelledAt: null }, orderBy: { startTime: "asc" }, take: 1, select: { id: true } },
+          },
+        })
+      : null;
 
   return (
     <FunnelPage>
@@ -183,19 +232,27 @@ export default async function FirstClassPage({
               >
                 {online ? "Online, join from home" : "In person"}
               </span>
-              {partner && (
-                <span
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    background: "oklch(99.5% 0.004 70)",
-                    border: "1px solid oklch(86% 0.01 70)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {partner}
-                </span>
-              )}
+              {[
+                isTrial ? "Free trial" : isCourse ? `Course · ${weeks} weeks` : null,
+                scaleLabel(danceClass.level),
+                limits ? "Partner class · no partner needed" : partner,
+                limits && limits.rule !== "NONE" ? neededChip(danceClass.roles) : null,
+              ]
+                .filter((x): x is string => Boolean(x))
+                .map((label) => (
+                  <span
+                    key={label}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      background: "oklch(99.5% 0.004 70)",
+                      border: "1px solid oklch(86% 0.01 70)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </span>
+                ))}
               {danceClass.firstTimersBooked > 0 && (
                 <span
                   style={{
@@ -397,7 +454,7 @@ export default async function FirstClassPage({
             </div>
           )}
 
-          {siblings.length > 1 && (
+          {siblings.length > 1 && !isCourse && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <h2
                 style={{
@@ -454,6 +511,40 @@ export default async function FirstClassPage({
             </div>
           )}
 
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+              gap: 16,
+            }}
+          >
+            {limits && <RolesCard limits={limits} roles={danceClass.roles} dateLabel={dayLabel(danceClass.startTime)} />}
+            <PolicyCard
+              policy={danceClass.policy}
+              start={danceClass.startTime}
+              tz={tz}
+              hostName={danceClass.studio?.name ?? danceClass.hostName}
+              course={isCourse}
+            />
+            {course && course.sessions[0] && danceClass.studio && (
+              <CourseCard
+                studioId={danceClass.studio.id}
+                studioName={danceClass.studio.name}
+                signedIn={Boolean(user)}
+                course={{
+                  id: course.sessions[0].id,
+                  title: course.title,
+                  style: course.style,
+                  weeks: course.courseWeeks ?? 0,
+                  priceCents: course.coursePriceCents ?? 0,
+                  currency: course.currency,
+                  started: course.startsOn.getTime() <= Date.now(),
+                  startsLabel: dayLabel(course.startsOn),
+                  nextTermLabel: nextTermLabel(course.startsOn, course.courseWeeks),
+                }}
+              />
+            )}
+          </div>
         </div>
 
         {/* Sticky book bar, the handoff's bottom rail. */}
@@ -487,17 +578,19 @@ export default async function FirstClassPage({
               <span
                 style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 18 }}
               >
-                {danceClass.priceCents === 0
-                  ? "Free"
-                  : formatMoney(danceClass.priceCents, danceClass.currency)}{" "}
-                · {formatClassWhen(danceClass.startTime, danceClass.timezone)}
+                {priceLine} · {isCourse ? `from ${formatClassWhen(danceClass.startTime, tz)}` : formatClassWhen(danceClass.startTime, tz)}
               </span>
               <span style={{ fontSize: 13, color: "oklch(42% 0.02 60)" }}>
-                {seatsLeft > 0
-                  ? "Cancel free from your schedule any time."
-                  : "Full. Join the waitlist and we'll email if a seat opens."}
+                {courseStarted
+                  ? `This term has started.${danceClass.series ? ` Next term starts ${nextTermLabel(danceClass.series.startsOn, weeks)}.` : ""}`
+                  : seatsLeft > 0
+                    ? `Free cancellation until ${cutoffLabel(danceClass.startTime, tz, danceClass.policy)}.`
+                    : isCourse
+                      ? "This course is full."
+                      : "Full. Join the waitlist and we'll email if a seat opens."}
               </span>
             </div>
+            {!courseStarted && !(isCourse && seatsLeft === 0) && (
             <Link
               href={bookHref}
               style={{
@@ -513,8 +606,9 @@ export default async function FirstClassPage({
                 textDecoration: "none",
               }}
             >
-              {seatsLeft > 0 ? "Book" : "Join waitlist"}
+              {seatsLeft === 0 ? "Join waitlist" : isCourse ? "Enrol" : isTrial ? "Book free trial" : "Book"}
             </Link>
+            )}
           </div>
         </div>
       </div>

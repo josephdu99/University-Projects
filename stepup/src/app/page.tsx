@@ -305,7 +305,7 @@ export default async function Home() {
                 borderRadius: 8,
               }}
             >
-              Cancel free.
+              Cancel free before the cut-off.
             </span>
           </div>
           <div

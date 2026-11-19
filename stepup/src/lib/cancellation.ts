@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { issueToken, TOKEN_PURPOSE } from "@/lib/tokens";
 import { releaseSeat, type Promoted } from "@/lib/booking";
 import { refundPayment } from "@/lib/stripe";
 import { appUrl, sendWaitlistPromoted } from "@/lib/email";
@@ -34,11 +35,15 @@ export async function notifyPromoted(promoted: Promoted[]): Promise<void> {
     const b = await db.booking.findUnique({
       where: { id: p.bookingId },
       select: {
-        user: { select: { email: true, name: true } },
+        user: { select: { id: true, email: true, name: true, passwordHash: true } },
         class: { select: { id: true, title: true, startTime: true, timezone: true } },
       },
     });
     if (!b?.user.email) continue;
+    // A guest has no login, so their link carries its own pass.
+    const payPath = b.user.passwordHash
+      ? `/first-class/${b.class.id}/booked`
+      : `/first-class/${b.class.id}/booked?t=${encodeURIComponent(await issueToken(b.user.id, TOKEN_PURPOSE.GUEST_BOOKING))}`;
     const send =
       p.status === "BOOKED"
         ? sendWaitlistPromoted({
@@ -53,7 +58,7 @@ export async function notifyPromoted(promoted: Promoted[]): Promise<void> {
             classTitle: b.class.title,
             startTime: b.class.startTime,
             timezone: b.class.timezone,
-            payUrl: appUrl(`/first-class/${b.class.id}/book`),
+            payUrl: appUrl(payPath),
             holdHours: OFFER_HOLD_HOURS,
           });
     await send.catch((err) => logError("email.waitlistPromoted", err));

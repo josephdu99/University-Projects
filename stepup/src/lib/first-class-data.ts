@@ -1,4 +1,6 @@
 import { db } from "@/lib/db";
+import { stepupCapacity } from "@/lib/booking";
+import { effectivePolicy } from "@/lib/policies";
 import type { CandidateClass } from "@/lib/first-class";
 import { findSuburb, suburbFromAddress } from "@/lib/suburbs";
 import { imageUrl } from "@/lib/images";
@@ -164,6 +166,7 @@ export async function getPublicClass(id: string) {
       },
       studio: {
         select: {
+          id: true,
           name: true,
           city: true,
           address: true,
@@ -171,8 +174,13 @@ export async function getPublicClass(id: string) {
           suspendedAt: true,
           arrive: true,
           photoId: true,
+          cancelPolicy: true,
+          healthFormUrl: true,
         },
       },
+      series: { select: { courseWeeks: true, coursePriceCents: true, startsOn: true, endsOn: true } },
+      venue: { select: { name: true, address: true } },
+      walkIns: { select: { role: true } },
       teacherMember: {
         select: {
           name: true,
@@ -181,11 +189,13 @@ export async function getPublicClass(id: string) {
       },
       bookings: {
         where: { status: { in: SEAT_HOLDING } },
-        select: { userId: true },
+        select: { userId: true, role: true },
       },
     },
   });
-  if (!c || c.cancelledAt || (c.studio && c.studio.suspendedAt !== null)) {
+  // Not on StepUp: hidden classes are the studio's own, and kids' classes
+  // wait for guardian booking.
+  if (!c || c.cancelledAt || (c.studio && c.studio.suspendedAt !== null) || c.listing === "HIDDEN" || c.kids) {
     return null;
   }
 
@@ -211,6 +221,11 @@ export async function getPublicClass(id: string) {
 
   return {
     ...c,
+    // The spots StepUp may sell, which may be fewer than the room holds.
+    capacity: stepupCapacity(c),
+    roomCapacity: c.capacity,
+    roles: [...c.bookings.map((b) => b.role), ...c.walkIns.map((w) => w.role)],
+    policy: effectivePolicy(c.cancelPolicy, c.studio?.cancelPolicy),
     seatsTaken: c.bookings.length,
     firstTimersBooked: c.bookings.filter((b) => !veterans.has(b.userId)).length,
     hostName: c.host.displayName?.trim() || c.host.name,

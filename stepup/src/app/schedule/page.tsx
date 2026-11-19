@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { cutoffLabel } from "@/lib/policy-copy";
+import { effectivePolicy } from "@/lib/policies";
 import { requireRole } from "@/lib/session";
 import { publicName } from "@/lib/roles";
 import { C, DISPLAY } from "@/lib/marketing-theme";
@@ -25,10 +27,10 @@ const LIVE = ["BOOKED", "PENDING_PAYMENT", "WAITLISTED"];
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string }>;
+  searchParams: Promise<{ paid?: string; course?: string }>;
 }) {
   const user = await requireRole("STUDENT");
-  const { paid } = await searchParams;
+  const { paid, course } = await searchParams;
   const tz = user.timezone;
   const now = new Date();
 
@@ -37,7 +39,7 @@ export default async function SchedulePage({
     include: {
       class: {
         include: {
-          studio: { select: { name: true, address: true, city: true } },
+          studio: { select: { name: true, address: true, city: true, cancelPolicy: true } },
           host: { select: { name: true, displayName: true } },
         },
       },
@@ -60,6 +62,18 @@ export default async function SchedulePage({
 
   return (
     <div>
+      {course && (
+        <p
+          role="status"
+          style={{ margin: "0 0 20px", padding: "14px 20px", borderRadius: 16, background: "oklch(95% 0.012 70)", fontSize: 14.5, fontWeight: 600 }}
+        >
+          {course === "full"
+            ? "Course enrolment cancelled. Anything you paid is on its way back to your card."
+            : course === "credit"
+              ? "Course enrolment cancelled. It was after the free cancellation cut-off, so you have credit at the studio instead of a refund."
+              : "Course enrolment cancelled. It was after the free cancellation cut-off, so there's nothing back this time."}
+        </p>
+      )}
       {paid === "1" && (
         <p
           style={{
@@ -420,8 +434,10 @@ type HeroBooking = {
     durationMin: number;
     onlineLink: string | null;
     checkInCode: string | null;
-    studio: { name: string; address: string; city: string } | null;
+    studio: { name: string; address: string; city: string; cancelPolicy: string } | null;
     host: { name: string; displayName: string | null };
+    cancelPolicy: string | null;
+    timezone: string;
   };
 };
 
@@ -636,7 +652,7 @@ function NextClassHero({
           >
             {phase === "now"
               ? "This class has started"
-              : "Free to cancel any time before it starts"}
+              : `Free cancellation until ${cutoffLabel(c.startTime, c.timezone, effectivePolicy(c.cancelPolicy, c.studio?.cancelPolicy))}`}
           </div>
         </div>
       </div>

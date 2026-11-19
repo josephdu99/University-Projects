@@ -58,5 +58,6 @@ export async function refreshPayoutStatusAction(): Promise<void> {
   }
 
   revalidatePath("/studio");
+  revalidatePath("/studio/payouts");
   revalidatePath("/teach");
 }

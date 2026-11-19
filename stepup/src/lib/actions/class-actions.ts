@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { sendSms } from "@/lib/sms";
 import { recordAttendance, type AwardedBadge } from "@/lib/gamification";
 import { reserveSeat } from "@/lib/booking";
 import { checkExtras, extrasFromForm, applyExtras } from "@/lib/booking-extras";
@@ -13,6 +14,7 @@ import { requireRole, requireUser } from "@/lib/session";
 import { CLASS_FORMATS, DANCE_LEVELS } from "@/lib/roles";
 import {
   zonedDateTimeToUtc,
+  formatClassWhen,
   formatClassWhenLong,
   isValidTimeZone,
   addDaysToDateString,
@@ -576,7 +578,7 @@ export async function cancelClassAction(
       host: { select: { name: true, displayName: true } },
       bookings: {
         where: { status: { in: ["BOOKED", "PENDING_PAYMENT", "WAITLISTED"] } },
-        include: { user: { select: { email: true, name: true } }, payment: true },
+        include: { user: { select: { email: true, name: true, phone: true } }, payment: true },
       },
     },
   });
@@ -629,6 +631,14 @@ export async function cancelClassAction(
       await refundPayment(booking.payment.id).catch((err) =>
         logError("stripe.refund", err, { bookingId: booking.id })
       );
+    }
+    if (booking.status !== "WAITLISTED") {
+      await sendSms(
+        booking.user.phone,
+        `${hostName}: ${danceClass.title}, ${formatClassWhen(danceClass.startTime, danceClass.timezone)}, is cancelled${reason ? ` (${reason})` : ""}. ${
+          booking.payment?.status === "PAID" && !booking.enrolmentId ? "You'll get a full refund. " : ""
+        }Our other classes: ${appUrl(others[0] ? `/first-class/${others[0].id}` : "/discover")}`,
+      ).catch(() => false);
     }
     if (booking.user.email) {
       await sendClassCancelled({

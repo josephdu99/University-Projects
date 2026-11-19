@@ -17,6 +17,22 @@ export function hostNav(base: "/studio" | "/teach"): NavItem[] {
   ];
 }
 
+/**
+ * The studio dashboard's six tabs (flow v6.4). Payouts is only there for the
+ * account the money goes to. The account itself (name, password) lives at
+ * /profile, reached from the name in the corner.
+ */
+export function studioNav(showPayouts: boolean): NavItem[] {
+  return [
+    { href: "/studio", label: "Studio", exact: true },
+    { href: "/studio/dancers", label: "Dancers" },
+    { href: "/studio/team", label: "Team" },
+    ...(showPayouts ? [{ href: "/studio/payouts", label: "Payouts" }] : []),
+    { href: "/studio/policies", label: "Policies" },
+    { href: "/studio/profile", label: "Profile" },
+  ];
+}
+
 export const DANCER_NAV: NavItem[] = [
   { href: "/discover", label: "Discover" },
   { href: "/schedule", label: "My classes" },
@@ -36,12 +52,15 @@ export function AppChrome({
   items,
   user,
   maxWidth = 1120,
+  accountHref,
   children,
 }: {
   items: NavItem[];
   /** `mark` and `color` let an instructor's chosen avatar follow them. */
   user: { name: string; mark?: string | null; color?: string };
   maxWidth?: number;
+  /** Where the name in the corner goes: the account page, when it isn't a tab. */
+  accountHref?: string;
   children: ReactNode;
 }) {
   return (
@@ -111,9 +130,19 @@ export function AppChrome({
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 14 }}>
-              {user.name}
-            </div>
+            {accountHref ? (
+              <Link
+                href={accountHref}
+                style={{ display: "block", fontFamily: DISPLAY, fontWeight: 700, fontSize: 14, color: C.ink, textDecoration: "none" }}
+                title="Your account"
+              >
+                {user.name}
+              </Link>
+            ) : (
+              <div style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 14 }}>
+                {user.name}
+              </div>
+            )}
             <form action={logoutAction}>
               <button
                 type="submit"

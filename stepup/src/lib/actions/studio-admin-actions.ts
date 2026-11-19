@@ -5,10 +5,8 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { canRunClass, getStudioAccess, studioPerms } from "@/lib/studio-access";
 import { setAttendance, addWalkIn, type Mark } from "@/lib/attendance";
-import { sendSms, smsConfigured } from "@/lib/sms";
-import { sendClassMessage, sendCourseOpen, sendPassOffer, sendVenueChanged } from "@/lib/email-studio";
-import { appUrl } from "@/lib/email";
-import { unsubscribePath } from "@/lib/signed-links";
+import { deliverPassOffer, moveClass, notifyCourseInterest, passAudience, sendToClass, venueFor } from "@/lib/studio-ops";
+import { cancelClassAction } from "@/lib/actions/class-actions";
 import { studioClassProblems, studioDraftFromForm } from "@/lib/studio-class-form";
 import { createStudioClass } from "@/lib/studio-classes";
 import { DANCE_STYLES, formatClock } from "@/lib/class-form";
@@ -17,8 +15,8 @@ import { isScaleLevel } from "@/lib/levels";
 import { isWwccNumber, normaliseWwcc, wwccCurrent } from "@/lib/wwcc";
 import { saveUploadedImage } from "@/lib/images";
 import { saveUploadedPdf } from "@/lib/documents";
-import { formatClassWhen, formatClassWhenLong, dateKeyInTimeZone } from "@/lib/time";
-import { suburbFromAddress, findSuburb } from "@/lib/suburbs";
+import { formatClassWhen, dateKeyInTimeZone } from "@/lib/time";
+import { suburbFromAddress } from "@/lib/suburbs";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { setStripePayoutDay } from "@/lib/stripe";
 import { logError } from "@/lib/logger";
@@ -112,56 +110,32 @@ export async function messageClassAction(classId: string, formData: FormData): P
   if (body.length > 320) return { ok: false, error: "Keep it to 320 characters." };
   const limit = await checkRateLimit(`class-msg:${classId}`, 10, 24 * 60 * 60_000);
   if (!limit.allowed) return { ok: false, error: "That's a lot of messages for one class today." };
-  return sendToClass(ctx.c, ctx.user.id, body);
+  const message = await sendToClass(ctx.c, ctx.user.id, body);
+  return done(message, ["/studio", `/class-list/${classId}`]);
 }
 
-export async function sendToClass(
-  c: { id: string; title: string; startTime: Date; timezone: string; studio: { name: string; owner: { email: string } } | null; host: { name: string; displayName: string | null; email: string } },
-  senderId: string,
-  body: string,
-): Promise<Result> {
-  const booked = await db.booking.findMany({
-    where: { classId: c.id, status: { in: ["BOOKED", "PENDING_PAYMENT"] } },
-    select: { user: { select: { email: true, name: true, phone: true } } },
+/** Cancel from the class sheet: refunds, emails, and "same studio first". */
+export async function cancelClassFromSheetAction(classId: string, reason: string): Promise<Result> {
+  const a = await actor();
+  if (!a) return { ok: false, error: "Only the people who run the studio can cancel classes." };
+  const c = await db.danceClass.findFirst({
+    where: { id: classId, studioId: a.studio.id },
+    select: { title: true, cancelledAt: true, _count: { select: { bookings: { where: { status: { in: ["BOOKED", "PENDING_PAYMENT"] } } } } } },
   });
-  const hostName = c.studio?.name ?? (c.host.displayName?.trim() || c.host.name);
-  const sms = smsConfigured();
-  for (const b of booked) {
-    if (b.user.email) {
-      await sendClassMessage({
-        to: b.user.email,
-        name: b.user.name,
-        hostName,
-        classTitle: c.title,
-        startTime: c.startTime,
-        timezone: c.timezone,
-        body,
-        replyTo: c.studio?.owner.email ?? c.host.email,
-      }).catch((err) => logError("email.classMessage", err));
-    }
-    if (sms) await sendSms(b.user.phone, `${hostName}, ${c.title}: ${body}`).catch(() => false);
-  }
-  await db.classMessage.create({
-    data: { classId: c.id, senderId, body, recipients: booked.length, channels: sms ? "SMS_EMAIL" : "EMAIL" },
-  });
-  const n = `${booked.length} ${booked.length === 1 ? "student" : "students"}`;
-  return done(`Message sent to ${n} by ${sms ? "SMS and email" : "email"}.`, ["/studio", `/class-list/${c.id}`]);
+  if (!c) return { ok: false, error: "Class not found." };
+  if (c.cancelledAt) return { ok: false, error: "This class is already cancelled." };
+  const fd = new FormData();
+  fd.set("reason", reason.slice(0, 120));
+  await cancelClassAction(classId, fd);
+  const n = c._count.bookings;
+  return done(
+    n
+      ? `${c.title} is cancelled. ${n} ${n === 1 ? "student was" : "students were"} told, refunded where they paid, and shown your other classes first.`
+      : `${c.title} is cancelled.`,
+  );
 }
 
-/** Resolve a venue choice ("studio" or a saved venue's id) for a studio. */
-async function venueFor(studio: { id: string; name: string; address: string; city: string; suburb: string | null }, choice: string) {
-  if (choice === "studio" || !choice) {
-    return {
-      id: null,
-      name: studio.name,
-      location: `${studio.address}, ${studio.city}`,
-      suburb: findSuburb(studio.suburb)?.name ?? suburbFromAddress(studio.address)?.name ?? null,
-    };
-  }
-  const v = await db.venue.findFirst({ where: { id: choice, studioId: studio.id } });
-  if (!v) return null;
-  return { id: v.id, name: v.name, location: v.address, suburb: v.suburb ?? suburbFromAddress(v.address)?.name ?? null };
-}
+
 
 /**
  * Move one class, or this and every later class in its series, keeping the
@@ -178,47 +152,10 @@ export async function moveClassAction(classId: string, formData: FormData): Prom
   const v = await venueFor(a.studio, str(formData, "venue"));
   if (!v) return { ok: false, error: "Pick a venue." };
   if ((v.id ?? null) === (c.venueId ?? null)) return { ok: false, error: "That's where it already is." };
-  return moveClass(c, v, str(formData, "scope") === "future");
+  const message = await moveClass(c, v, str(formData, "scope") === "future");
+  return done(message);
 }
 
-export async function moveClass(
-  c: { id: string; seriesId: string | null; startTime: Date },
-  v: { id: string | null; name: string; location: string; suburb: string | null },
-  future: boolean,
-): Promise<Result> {
-  const now = new Date();
-  const data = { venueId: v.id, location: v.location, suburb: v.suburb, venueChangedAt: now };
-  const where = future && c.seriesId ? { seriesId: c.seriesId, startTime: { gte: c.startTime }, cancelledAt: null } : { id: c.id };
-  const moved = await db.danceClass.findMany({ where, select: { id: true, title: true, startTime: true, timezone: true } });
-  await db.danceClass.updateMany({ where, data });
-  if (future && c.seriesId) {
-    await db.classSeries.update({ where: { id: c.seriesId }, data: { venueId: v.id, location: v.location, suburb: v.suburb } });
-  }
-  const bookings = await db.booking.findMany({
-    where: { classId: { in: moved.map((m) => m.id) }, status: { in: ["BOOKED", "PENDING_PAYMENT"] } },
-    select: { classId: true, user: { select: { email: true, phone: true } } },
-  });
-  for (const b of bookings) {
-    const m = moved.find((x) => x.id === b.classId)!;
-    if (b.user.email) {
-      await sendVenueChanged({
-        to: b.user.email,
-        classTitle: m.title,
-        startTime: m.startTime,
-        timezone: m.timezone,
-        venueName: v.name,
-        address: v.location,
-        classUrl: appUrl(`/first-class/${m.id}`),
-      }).catch((err) => logError("email.venueChanged", err));
-    }
-    await sendSms(b.user.phone, `${m.title}, ${formatClassWhen(m.startTime, m.timezone)}, has moved to ${v.name}, ${v.location}. Can't make it? Cancel free in StepUp.`).catch(() => false);
-  }
-  const n = `${bookings.length} ${bookings.length === 1 ? "student" : "students"}`;
-  return done(
-    `${moved[0]?.title ?? "Class"} ${future ? "(this and all future classes)" : "(this class only)"} moved to ${v.name}. ${n} told by ${smsConfigured() ? "SMS and email" : "email"}.`,
-    ["/studio"],
-  );
-}
 
 // ─── Create a class (v6.4 form) ──────────────────────────────────────────────
 
@@ -281,28 +218,6 @@ export async function createStudioClassV2Action(_prev: Result, formData: FormDat
   );
 }
 
-async function notifyCourseInterest(
-  studio: { id: string; name: string; timezone: string },
-  style: string,
-  classId: string,
-  startsOn: Date,
-) {
-  const waiting = await db.courseInterest.findMany({ where: { studioId: studio.id, style, notifiedAt: null } });
-  for (const w of waiting) {
-    const user = await db.user.findUnique({ where: { email: w.email }, select: { id: true } });
-    const unsubscribe = user ? appUrl(unsubscribePath(user.id, studio.id)) : appUrl("/");
-    await sendCourseOpen({
-      to: w.email,
-      studioName: studio.name,
-      courseTitle: `${style} course`,
-      startsOn,
-      timezone: studio.timezone,
-      url: appUrl(`/first-class/${classId}`),
-      unsubscribeUrl: unsubscribe,
-    }).catch((err) => logError("email.courseOpen", err));
-    await db.courseInterest.update({ where: { id: w.id }, data: { notifiedAt: new Date() } });
-  }
-}
 
 // ─── Team: roles and Working With Children Checks ───────────────────────────
 
@@ -568,44 +483,3 @@ export async function sendPassOfferAction(_prev: Result, formData: FormData): Pr
   return done(`Pass offer sent to ${students.length} ${students.length === 1 ? "student" : "students"}. No commission on pass sales.`, ["/studio/dancers"]);
 }
 
-export async function passAudience(hostId: string, studioId: string, audience: "FIRST" | "ALL") {
-  const optedOut = new Set((await db.studioOptOut.findMany({ where: { studioId }, select: { userId: true } })).map((o) => o.userId));
-  const attended = await db.booking.groupBy({
-    by: ["userId"],
-    where: { class: { hostId }, status: "ATTENDED" },
-    _count: { _all: true },
-  });
-  const ids = attended.filter((r) => (audience === "ALL" ? true : r._count._all === 1)).map((r) => r.userId).filter((id) => !optedOut.has(id));
-  return db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true } });
-}
-
-export async function deliverPassOffer(
-  studio: { id: string; name: string; owner?: { email: string } | null },
-  pass: { id: string; name: string; priceCents: number; link: string | null },
-  message: string,
-  student: { id: string; name: string; email: string },
-  offerId: string,
-) {
-  const owner = studio.owner ?? (await db.studio.findUnique({ where: { id: studio.id }, select: { owner: { select: { email: true } } } }))?.owner;
-  await sendPassOffer({
-    to: student.email,
-    name: student.name,
-    studioName: studio.name,
-    message,
-    passName: pass.name,
-    priceCents: pass.priceCents,
-    link: pass.link,
-    replyTo: owner?.email ?? null,
-    unsubscribeUrl: appUrl(unsubscribePath(student.id, studio.id)),
-  }).catch((err) => logError("email.passOffer", err));
-  await db.passOfferRecipient.upsert({
-    where: { offerId_userId: { offerId, userId: student.id } },
-    create: { offerId, userId: student.id },
-    update: {},
-  });
-}
-
-/** For the closing insight and value line: a one-line natural date. */
-export async function describeWhen(start: Date, tz: string) {
-  return formatClassWhenLong(start, tz);
-}

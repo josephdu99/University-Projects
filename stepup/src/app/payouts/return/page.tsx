@@ -21,5 +21,5 @@ export default async function PayoutReturnPage() {
     }
   }
 
-  redirect(ROLE_HOME[user.role]);
+  redirect(user.role === "STUDIO_OWNER" ? "/studio/payouts" : ROLE_HOME[user.role]);
 }

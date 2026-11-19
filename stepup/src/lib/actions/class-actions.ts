@@ -22,6 +22,7 @@ import {
   sendWaitlistPromoted,
 } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { canManageClass } from "@/lib/studio-access";
 import { logError } from "@/lib/logger";
 
 export type ActionState = { error?: string; success?: string } | undefined;
@@ -216,10 +217,10 @@ export async function checkInStudentAction(bookingId: string): Promise<void> {
 
   const booking = await db.booking.findUnique({
     where: { id: bookingId },
-    include: { class: { select: { hostId: true, id: true } } },
+    include: { class: { select: { hostId: true, studioId: true, id: true } } },
   });
   if (!booking) return;
-  if (booking.class.hostId !== user.id && user.role !== "ADMIN") return;
+  if (!(await canManageClass(user, booking.class))) return;
 
   const result = await recordAttendance(bookingId);
   if (!result.ok) logError("attendance.checkIn", new Error(result.reason), { bookingId });
@@ -234,9 +235,9 @@ export async function openCheckInAction(classId: string): Promise<void> {
 
   const danceClass = await db.danceClass.findUnique({
     where: { id: classId },
-    select: { hostId: true },
+    select: { hostId: true, studioId: true },
   });
-  if (!danceClass || danceClass.hostId !== user.id) return;
+  if (!danceClass || !(await canManageClass(user, danceClass))) return;
 
   // Unambiguous alphabet: no O/0 or I/1 to mistype.
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -436,7 +437,7 @@ export async function editClassAction(
     include: { bookings: { where: { status: { in: ["BOOKED", "PENDING_PAYMENT"] } } } },
   });
   if (!existing) return { error: "Class not found." };
-  if (existing.hostId !== user.id && user.role !== "ADMIN") {
+  if (!(await canManageClass(user, existing))) {
     return { error: "You can't edit this class." };
   }
 
@@ -497,7 +498,7 @@ export async function cancelClassAction(
     },
   });
   if (!danceClass) return;
-  if (danceClass.hostId !== user.id && user.role !== "ADMIN") return;
+  if (!(await canManageClass(user, danceClass))) return;
   if (danceClass.cancelledAt) return;
 
   await db.danceClass.update({

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { CandidateClass } from "@/lib/first-class";
-import { suburbFromAddress } from "@/lib/suburbs";
+import { findSuburb, suburbFromAddress } from "@/lib/suburbs";
+import { imageUrl } from "@/lib/images";
 
 const SEAT_HOLDING = ["BOOKED", "ATTENDED", "PENDING_PAYMENT"];
 
@@ -22,11 +23,13 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
       level: { in: ["BEGINNER", "ALL_LEVELS"] },
     },
     orderBy: { startTime: "asc" },
-    take: 60,
+    // Repeating classes have a dozen dated sessions each; enough rows to
+    // still have sixty different classes once those are folded together.
+    take: 400,
     include: {
       host: { select: { name: true, displayName: true } },
       studio: {
-        select: { name: true, city: true, address: true, suspendedAt: true },
+        select: { name: true, city: true, address: true, suburb: true, photoId: true, suspendedAt: true },
       },
       bookings: {
         where: { status: { in: SEAT_HOLDING } },
@@ -35,7 +38,19 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
     },
   });
 
-  const live = classes.filter((c) => !c.studio || c.studio.suspendedAt === null);
+  // One entry per class: a weekly class is offered once, at its next date,
+  // rather than filling all three matches with the same class on three
+  // Tuesdays. Its page lists the other nights.
+  const seenSeries = new Set<string>();
+  const live = classes
+    .filter((c) => !c.studio || c.studio.suspendedAt === null)
+    .filter((c) => {
+      if (!c.seriesId) return true;
+      if (seenSeries.has(c.seriesId)) return false;
+      seenSeries.add(c.seriesId);
+      return true;
+    })
+    .slice(0, 60);
   if (live.length === 0) return [];
 
   // Who among everyone holding a seat has ever actually attended a class?
@@ -71,14 +86,32 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
     firstTimersBooked: c.bookings.filter((b) => !veterans.has(b.userId)).length,
     studioName: c.studio?.name ?? null,
     studioCity: c.studio?.city ?? null,
-    // Online classes are in no suburb, whatever their host's studio says.
-    suburb:
-      c.format === "ONLINE"
-        ? null
-        : (suburbFromAddress(c.location) ?? suburbFromAddress(c.studio?.address))
-            ?.name ?? null,
+    suburb: classSuburb(c),
     hostName: c.host.displayName?.trim() || c.host.name,
+    music: c.music,
+    photoUrl: imageUrl(c.studio?.photoId),
   }));
+}
+
+/**
+ * The Sydney suburb a class is in. Online classes are in none, whatever their
+ * host's studio says. Otherwise the suburb picked from the list wins (the
+ * class's own for an independent teacher, the studio's for a studio class),
+ * then whatever its address names.
+ */
+function classSuburb(c: {
+  format: string;
+  suburb: string | null;
+  location: string | null;
+  studio: { suburb: string | null; address: string } | null;
+}): string | null {
+  if (c.format === "ONLINE") return null;
+  return (
+    findSuburb(c.suburb)?.name ??
+    findSuburb(c.studio?.suburb)?.name ??
+    (suburbFromAddress(c.location) ?? suburbFromAddress(c.studio?.address))?.name ??
+    null
+  );
 }
 
 /**
@@ -90,12 +123,12 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
 export async function getStudioSuburbs(): Promise<string[]> {
   const studios = await db.studio.findMany({
     where: { suspendedAt: null },
-    select: { address: true },
+    select: { address: true, suburb: true },
   });
   return [
     ...new Set(
       studios.flatMap((s) => {
-        const at = suburbFromAddress(s.address);
+        const at = findSuburb(s.suburb) ?? suburbFromAddress(s.address);
         return at ? [at.name] : [];
       }),
     ),
@@ -107,8 +140,33 @@ export async function getPublicClass(id: string) {
   const c = await db.danceClass.findUnique({
     where: { id },
     include: {
-      host: { select: { name: true, displayName: true, avatarMark: true, avatarColor: true } },
-      studio: { select: { name: true, city: true, address: true, description: true, suspendedAt: true } },
+      host: {
+        select: {
+          name: true,
+          displayName: true,
+          avatarMark: true,
+          avatarColor: true,
+          teacherNote: true,
+          photoId: true,
+        },
+      },
+      studio: {
+        select: {
+          name: true,
+          city: true,
+          address: true,
+          description: true,
+          suspendedAt: true,
+          arrive: true,
+          photoId: true,
+        },
+      },
+      teacherMember: {
+        select: {
+          name: true,
+          user: { select: { teacherNote: true, photoId: true, displayName: true, name: true } },
+        },
+      },
       bookings: {
         where: { status: { in: SEAT_HOLDING } },
         select: { userId: true },
@@ -132,11 +190,22 @@ export async function getPublicClass(id: string) {
         ).map((b) => b.userId),
   );
 
+  // Who teaches it: the studio's assigned teacher, or for an independent
+  // class, its host. Their note to first-timers is the quote on the page.
+  const teacherUser = c.teacherMember?.user ?? (c.studioId ? null : c.host);
+  const teacherName = c.teacherMember
+    ? c.teacherMember.user?.displayName?.trim() || c.teacherMember.name
+    : c.host.displayName?.trim() || c.host.name;
+
   return {
     ...c,
     seatsTaken: c.bookings.length,
     firstTimersBooked: c.bookings.filter((b) => !veterans.has(b.userId)).length,
     hostName: c.host.displayName?.trim() || c.host.name,
+    teacherName,
+    teacherNote: teacherUser?.teacherNote ?? null,
+    teacherPhotoUrl: imageUrl(teacherUser?.photoId),
+    photoUrl: imageUrl(c.studio?.photoId),
   };
 }
 

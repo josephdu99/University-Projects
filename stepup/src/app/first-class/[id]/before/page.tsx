@@ -54,6 +54,10 @@ export default async function BeforeClassPage({
 
   const online = danceClass.format === "ONLINE";
   const address = danceClass.location ?? danceClass.studio?.address ?? null;
+  // The room and "how to find the door" are only shown once you've booked.
+  const door = [danceClass.room, danceClass.arrive ?? danceClass.studio?.arrive]
+    .filter(Boolean)
+    .join(". ");
   const started = hasStarted(danceClass.startTime);
 
   return (
@@ -137,8 +141,9 @@ export default async function BeforeClassPage({
             body={
               online
                 ? "This one is online. The joining link sits on your booking in My classes, and opens shortly before the start time."
-                : (address ??
-                  "The studio will confirm the address. It is on your booking in My classes.")
+                : address
+                  ? `${address}${door ? `. ${door}` : ""}`
+                  : "The studio will confirm the address. It is on your booking in My classes."
             }
           />
           <Brief

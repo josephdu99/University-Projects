@@ -13,7 +13,8 @@ datasource db {
 //
 // STUDENT      - takes classes, in person or online
 // STUDIO_OWNER - runs a physical studio, hosts in-person (or streamed) classes
-// INSTRUCTOR   - independent teacher with no studio, hosts online classes only
+// INSTRUCTOR   - teacher: independent (hosts their own online or in-person
+//                classes) and/or on a studio team via StudioMember
 // ADMIN        - platform staff; moderation and support tooling
 model User {
   id           String    @id @default(cuid())
@@ -51,10 +52,24 @@ model User {
 
   acceptedTermsAt DateTime?
 
+  // Mobile number, as entered at sign-up by studio staff and teachers. Not
+  // verified: nothing sends texts yet, so nothing claims to.
+  phone String?
+
+  // A teacher's public profile, shown on the classes they teach. The note is
+  // the quote on every class page ("Nobody's watching your feet but you").
+  teachStyles   String[] @default([])
+  yearsTeaching String?
+  teacherNote   String?
+  photoId       String?  @unique
+  photo         Image?   @relation("UserPhoto", fields: [photoId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   studio        Studio?              @relation("StudioOwner")
+  memberships   StudioMember[]       @relation("MemberUser")
+  invitesSent   StudioMember[]       @relation("MemberInvitedBy")
   hostedClasses DanceClass[]         @relation("ClassHost")
   hostedSeries  ClassSeries[]        @relation("SeriesHost")
   bookings      Booking[]
@@ -113,18 +128,89 @@ model Studio {
   timezone    String   @default("Australia/Sydney")
   emoji       String   @default("🏢")
 
+  // Australian Business Number, 11 digits, checked against the ABN checksum
+  // at sign-up. Null for studios that joined before it was asked for.
+  abn     String?
+  // The Sydney suburb from the shared list, which is what beginners are
+  // matched on. Older studios fall back to reading it off the address.
+  suburb  String?
+  // "How to find the door", shown to people once they have booked.
+  arrive  String?
+  styles  String[] @default([])
+  photoId String?  @unique
+  photo   Image?   @relation("StudioPhoto", fields: [photoId], references: [id], onDelete: SetNull)
+
   suspendedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // The account that signed the studio up. It hosts every studio class, so
+  // payments for them go to its payout account.
   ownerId String @unique
   owner   User   @relation("StudioOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   classes DanceClass[]
   series  ClassSeries[]
+  members StudioMember[]
 
   @@index([city])
+}
+
+// A person on a studio's team: the account holder, a manager, or a teacher.
+// Invited people exist here before they have an account, so `userId` is null
+// until they join with their invite code.
+//
+// ROLE:   "OWNER" | "MANAGER" | "TEACHER"
+// STATUS: "INVITED" | "ACTIVE"
+model StudioMember {
+  id      String  @id @default(cuid())
+  name    String
+  // Email or Australian mobile, exactly as the studio entered it.
+  contact String
+  role    String
+  status  String  @default("INVITED")
+  // Whether this person can be picked as a class's teacher. Always true for
+  // teachers; the owner turns it on with "I teach classes here too".
+  teaches Boolean @default(true)
+
+  // Random, single use and expiring. Cleared once someone joins with it, so a
+  // code that leaks after use opens nothing.
+  inviteCode      String?   @unique
+  inviteExpiresAt DateTime?
+  joinedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation("MemberUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  invitedById String?
+  invitedBy   User?   @relation("MemberInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  classes DanceClass[]  @relation("ClassTeacher")
+  series  ClassSeries[] @relation("SeriesTeacher")
+
+  @@unique([studioId, userId])
+  @@index([studioId, status])
+  @@index([userId])
+}
+
+// An uploaded photo, stored in the database so it needs no extra storage
+// service. Images are re-encoded to a modest JPEG in the browser before
+// upload and checked again on the server, so rows stay small.
+model Image {
+  id          String   @id @default(cuid())
+  contentType String
+  bytes       Bytes
+  createdAt   DateTime @default(now())
+
+  studio Studio? @relation("StudioPhoto")
+  user   User?   @relation("UserPhoto")
 }
 
 // Stripe Connect (Express) account for a host, so class fees are paid out to
@@ -170,6 +256,7 @@ model ClassSeries {
   // it survives daylight-saving shifts (7pm stays 7pm year round).
   localTime   String
   timezone    String @default("Australia/Sydney")
+  // "WEEKLY" | "FORTNIGHTLY"
   frequency   String @default("WEEKLY")
 
   durationMin Int     @default(60)
@@ -177,6 +264,16 @@ model ClassSeries {
   points      Int     @default(20)
   priceCents  Int     @default(0)
   currency    String  @default("aud")
+
+  // First Timer class details, copied onto every generated session.
+  music           String?
+  partner         String?
+  firstTimerSpots Int?
+  wear            String?
+  plan            String?
+  room            String?
+  suburb          String?
+  arrive          String?
 
   startsOn DateTime
   endsOn   DateTime?
@@ -191,6 +288,9 @@ model ClassSeries {
 
   studioId String?
   studio   Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  teacherMemberId String?
+  teacherMember   StudioMember? @relation("SeriesTeacher", fields: [teacherMemberId], references: [id], onDelete: SetNull)
 
   sessions DanceClass[]
 
@@ -225,6 +325,30 @@ model DanceClass {
   priceCents Int    @default(0)
   currency   String @default("aud")
 
+  // First Timer class details. All optional: classes listed before these
+  // fields existed simply don't have them, and the pages say less.
+  //
+  // MUSIC:   "latin" | "hiphop" | "classical" | "afro" | "any" (the matcher's ids)
+  // PARTNER: "SOLO" | "ROTATE" | "BRING"
+  music           String?
+  partner         String?
+  // Spots kept for people on their first class, at most `capacity`.
+  firstTimerSpots Int?
+  wear            String?
+  plan            String?
+  room            String?
+  // An independent instructor's in-person venue. Studio classes use the
+  // studio's suburb and door directions instead.
+  suburb          String?
+  arrive          String?
+
+  // Who teaches it, for a studio class. An independent instructor's class is
+  // taught by its host, so this stays null. A class belongs to a studio
+  // (studioId set, hosted by the studio's account) or to an independent
+  // instructor (studioId null), never both.
+  teacherMemberId String?
+  teacherMember   StudioMember? @relation("ClassTeacher", fields: [teacherMemberId], references: [id], onDelete: SetNull)
+
   // Short rotating code the host reveals during class; students enter it to
   // claim attendance. Null until the host starts check-in.
   checkInCode        String?
@@ -254,6 +378,7 @@ model DanceClass {
   @@index([studioId])
   @@index([style])
   @@index([cancelledAt, startTime])
+  @@index([teacherMemberId])
 }
 
 // ─── Bookings & payments ─────────────────────────────────────────────────────

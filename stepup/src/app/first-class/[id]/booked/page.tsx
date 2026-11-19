@@ -39,6 +39,9 @@ export default async function BookedPage({
   const first = viewer.name.split(" ")[0];
   const address =
     danceClass.location ?? danceClass.studio?.address ?? null;
+  const door = [danceClass.room, danceClass.arrive ?? danceClass.studio?.arrive]
+    .filter(Boolean)
+    .join(". ");
 
   return (
     <FunnelPage>
@@ -183,6 +186,9 @@ export default async function BookedPage({
                   ? "Online class. The joining link is on this page nearer the time."
                   : (address ?? "Address will be confirmed by the studio.")}
               </span>
+              {!online && door && (
+                <span style={{ fontSize: 15, color: "oklch(42% 0.02 60)" }}>{door}</span>
+              )}
             </div>
             <div style={{ fontSize: 15, color: "oklch(42% 0.02 60)" }}>
               {formatClassWhen(danceClass.startTime, danceClass.timezone)}

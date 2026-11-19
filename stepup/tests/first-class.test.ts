@@ -46,6 +46,8 @@ function cls(over: Partial<CandidateClass> = {}): CandidateClass {
     studioCity: "Sydney",
     suburb: "Surry Hills",
     hostName: "Maya",
+    music: null,
+    photoUrl: null,
     ...over,
   };
 }
@@ -105,6 +107,22 @@ describe("music", () => {
 
   it("matches nothing before a taste is picked", () => {
     expect(matchesMusic(cls(), null)).toBe(false);
+  });
+
+  it("believes the music a host chose over what the style suggests", () => {
+    const hipHopBallet = cls({ style: "Contemporary", music: "hiphop" });
+    expect(matchesMusic(hipHopBallet, "hiphop")).toBe(true);
+    expect(matchesMusic(hipHopBallet, "classical")).toBe(false);
+    expect(matchesMusic(hipHopBallet, "any")).toBe(true);
+    expect(matchesMusic(cls({ style: "Salsa", music: "classical" }), "any")).toBe(false);
+    expect(matchesMusic(cls({ style: "Jazz", music: "any" }), "latin")).toBe(true);
+    expect(matchesMusic(cls({ style: "Jazz", music: "any" }), "classical")).toBe(false);
+  });
+
+  it("says why in the class's own terms", () => {
+    const [top] = rankClasses([cls({ style: "Contemporary", music: "hiphop" })], A({ music: "hiphop" }));
+    expect(top.score).toBe(2);
+    expect(top.reasons[0]).toBe("It's danced to hip hop & R&B, which you picked.");
   });
 });
 

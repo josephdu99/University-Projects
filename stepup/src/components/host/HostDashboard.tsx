@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { C, DISPLAY } from "@/lib/marketing-theme";
-import { getHostDashboard } from "@/lib/host-data";
+import { collapseSeries, getHostDashboard } from "@/lib/host-data";
+import type { ClassDraft } from "@/lib/class-form";
+import type { TeacherOption } from "@/components/onboarding/ClassFields";
+import { OpenPanelButton, StudioBanner, StudioPanelProvider, type Panel } from "@/components/studio/StudioPanels";
+import { CreateClassPanel } from "@/components/studio/CreateClassPanel";
+import { TeamSection, type TeamRow } from "@/components/studio/TeamSection";
 import { startPayoutOnboardingAction } from "@/lib/actions/payout-actions";
 import { HostEqualizer } from "./HostEqualizer";
 import { ClassRowList } from "./ClassRow";
@@ -11,6 +16,54 @@ const PAST_ON_DASHBOARD = 6;
 /** Progress row in the "classes hosted" card caps out here. */
 const SEGMENTS = 8;
 
+/**
+ * What the studio dashboard adds: its team, and the in-page Create a class
+ * and Invite teachers panels. An instructor's dashboard has none of it.
+ */
+export type StudioMode = {
+  name: string;
+  /** "12 Beat St, Surry Hills, Sydney" */
+  venueLine: string;
+  styles: readonly string[];
+  photoUrl: string | null;
+  teachers: TeacherOption[];
+  team: TeamRow[];
+  ownerTeaches: boolean;
+  inviterName: string;
+  /** Paid classes are possible: the studio's account has payouts on. */
+  canCharge: boolean;
+  /** Payouts go to the account that signed the studio up; only it can set them up. */
+  isAccountHolder: boolean;
+  accountHolderName: string;
+  initialPanel: Panel | null;
+  prefill: Partial<ClassDraft> | null;
+  origin: string;
+};
+
+const PILL_PRIMARY = {
+  flex: "none",
+  whiteSpace: "nowrap",
+  fontWeight: 700,
+  fontSize: 15,
+  padding: "14px 24px",
+  borderRadius: 999,
+  border: 0,
+  background: C.brand,
+  color: C.onBrand,
+} as const;
+
+const PILL_OUTLINE = {
+  flex: "none",
+  whiteSpace: "nowrap",
+  fontWeight: 600,
+  fontSize: 15,
+  padding: "14px 24px",
+  borderRadius: 999,
+  border: `1.5px solid ${C.darkBorder}`,
+  background: C.ink,
+  color: "oklch(92% 0.01 70)",
+} as const;
+
 export async function HostDashboard({
   hostId,
   base,
@@ -19,6 +72,8 @@ export async function HostDashboard({
   timezone,
   payoutsConnected,
   editHref,
+  studio,
+  extra,
 }: {
   hostId: string;
   base: "/studio" | "/teach";
@@ -28,12 +83,19 @@ export async function HostDashboard({
   metaPrimary: string;
   timezone: string;
   payoutsConnected: boolean;
-  editHref: string;
+  editHref: string | null;
+  studio?: StudioMode;
+  /** A section of the caller's own, between payouts and upcoming classes. */
+  extra?: React.ReactNode;
 }) {
   const d = await getHostDashboard(hostId);
-  const newClassHref = `${base}/classes/new`;
+  // Teachers list in-person First Timer classes by default; that page links
+  // to the online class form for the other kind.
+  const newClassHref = base === "/teach" ? "/teach/classes/first-timer" : `${base}/classes/new`;
+  // One row per class: a weekly class is one line with its next date.
+  const upcoming = collapseSeries(d.upcoming);
 
-  return (
+  const content = (
     <>
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section
@@ -117,37 +179,42 @@ export async function HostDashboard({
             flexWrap: "wrap",
           }}
         >
-          <Link
-            href={newClassHref}
-            style={{
-              fontWeight: 700,
-              fontSize: 15,
-              padding: "14px 24px",
-              borderRadius: 999,
-              background: C.brand,
-              color: C.onBrand,
-              textDecoration: "none",
-            }}
-          >
-            Create a class
-          </Link>
-          <Link
-            href={editHref}
-            style={{
-              fontWeight: 600,
-              fontSize: 15,
-              padding: "14px 24px",
-              borderRadius: 999,
-              border: `1.5px solid ${C.darkBorder}`,
-              background: C.ink,
-              color: "oklch(92% 0.01 70)",
-              textDecoration: "none",
-            }}
-          >
-            {base === "/studio" ? "Edit studio" : "Edit profile"}
-          </Link>
+          {studio ? (
+            <>
+              <OpenPanelButton panel="class" style={PILL_PRIMARY}>
+                Create a class
+              </OpenPanelButton>
+              <OpenPanelButton panel="invite" style={PILL_OUTLINE}>
+                Invite teachers
+              </OpenPanelButton>
+            </>
+          ) : (
+            <Link href={newClassHref} style={{ ...PILL_PRIMARY, textDecoration: "none" }}>
+              Create a class
+            </Link>
+          )}
+          {editHref && (
+            <Link href={editHref} style={{ ...PILL_OUTLINE, textDecoration: "none" }}>
+              {base === "/studio" ? "Edit studio" : "Edit profile"}
+            </Link>
+          )}
         </div>
       </section>
+
+      {studio && (
+        <>
+          <StudioBanner />
+          <CreateClassPanel
+            studioName={studio.name}
+            venueLine={studio.venueLine}
+            styles={studio.styles}
+            teachers={studio.teachers}
+            canCharge={studio.canCharge}
+            prefill={studio.prefill}
+            photoUrl={studio.photoUrl}
+          />
+        </>
+      )}
 
       {/* ── STATS ────────────────────────────────────────────────────────── */}
       <section
@@ -158,14 +225,14 @@ export async function HostDashboard({
           marginBottom: 20,
         }}
       >
-        <StatCard label="Upcoming" value={d.upcoming.length} qualifier="classes on the calendar">
-          {d.upcoming.length === 0 ? (
+        <StatCard label="Upcoming" value={upcoming.length} qualifier={upcoming.length === 1 ? "class on the calendar" : "classes on the calendar"}>
+          {upcoming.length === 0 ? (
             <div style={{ fontSize: 13.5, color: C.warn, fontWeight: 600 }}>
               Nothing scheduled yet
             </div>
           ) : (
             <div style={{ fontSize: 13.5, color: C.label, fontWeight: 600 }}>
-              Next one {nextClassPhrase(d.upcoming[0].startTime)}
+              Next: {upcoming[0].title}, {nextClassPhrase(upcoming[0].startTime)}
             </div>
           )}
         </StatCard>
@@ -261,13 +328,15 @@ export async function HostDashboard({
                 </span>
               </div>
               <p style={{ fontSize: 15, color: C.nudgeInk, margin: 0, maxWidth: 520 }}>
-                Connect a payout account to charge for classes and receive money
-                directly. Free classes work without it, so there&apos;s no rush.
+                {studio && !studio.isAccountHolder
+                  ? `Payments for ${studio.name} go to ${studio.accountHolderName}'s payout account, so they set it up. Free classes work without it.`
+                  : "Connect a payout account to charge for classes and receive money directly. Free classes work without it, so there's no rush."}
               </p>
             </div>
           </div>
           {/* Onboarding is a Stripe redirect, so this posts a server action
               rather than linking anywhere. */}
+          {(!studio || studio.isAccountHolder) && (
           <form action={startPayoutOnboardingAction} style={{ flex: "none" }}>
             <button
               type="submit"
@@ -286,19 +355,33 @@ export async function HostDashboard({
               Set up payouts
             </button>
           </form>
+          )}
         </section>
+      )}
+
+      {extra}
+
+      {/* ── TEAM — studios only ──────────────────────────────────────────── */}
+      {studio && (
+        <TeamSection
+          rows={studio.team}
+          studioName={studio.name}
+          inviterName={studio.inviterName}
+          ownerTeaches={studio.ownerTeaches}
+          origin={studio.origin}
+        />
       )}
 
       {/* ── UPCOMING ─────────────────────────────────────────────────────── */}
       <SectionHeader title="Upcoming classes">
-        {d.upcoming.length > 0 && (
+        {upcoming.length > 0 && (
           <Link href={`${base}/classes`} style={{ fontSize: 14, fontWeight: 600, color: C.brand }}>
             View all classes
           </Link>
         )}
       </SectionHeader>
 
-      {d.upcoming.length === 0 ? (
+      {upcoming.length === 0 ? (
         <div
           style={{
             background: C.card,
@@ -325,25 +408,41 @@ export async function HostDashboard({
               ? `Your last class filled ${d.lastPastFill.booked} of ${d.lastPastFill.capacity} spots. Post another and it shows up in Discover straight away.`
               : "Post your first class and it goes live to dancers browsing StepUp straight away."}
           </p>
-          <Link
-            href={newClassHref}
-            style={{
-              display: "inline-block",
-              fontWeight: 700,
-              fontSize: 15,
-              padding: "14px 28px",
-              borderRadius: 999,
-              background: C.brand,
-              color: C.onBrand,
-              textDecoration: "none",
-            }}
-          >
-            Create a class
-          </Link>
+          {studio ? (
+            <OpenPanelButton panel="class" style={{ ...PILL_PRIMARY, display: "inline-block", padding: "14px 28px" }}>
+              Create a class
+            </OpenPanelButton>
+          ) : (
+            <Link
+              href={newClassHref}
+              style={{
+                display: "inline-block",
+                fontWeight: 700,
+                fontSize: 15,
+                padding: "14px 28px",
+                borderRadius: 999,
+                background: C.brand,
+                color: C.onBrand,
+                textDecoration: "none",
+              }}
+            >
+              Create a class
+            </Link>
+          )}
         </div>
       ) : (
         <div style={{ marginBottom: 44 }}>
-          <ClassRowList classes={d.upcoming} base={base} action="manage" />
+          <ClassRowList classes={upcoming} base={base} action="manage" />
+          {studio && (
+            <div style={{ marginTop: 14 }}>
+              <OpenPanelButton
+                panel="class"
+                style={{ fontWeight: 700, fontSize: 14.5, padding: "10px 18px", borderRadius: 999, border: "1.5px dashed oklch(22% 0.02 60)", background: "transparent", color: C.ink }}
+              >
+                + Create another class
+              </OpenPanelButton>
+            </div>
+          )}
         </div>
       )}
 
@@ -490,6 +589,12 @@ export async function HostDashboard({
         </section>
       )}
     </>
+  );
+
+  return studio ? (
+    <StudioPanelProvider initial={studio.initialPanel}>{content}</StudioPanelProvider>
+  ) : (
+    content
   );
 }
 

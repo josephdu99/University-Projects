@@ -82,6 +82,20 @@ export function ClassRow({
               {c.title}
             </Link>
           </h3>
+          {c.level === "BEGINNER" && !c.cancelledAt && (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "4px 11px",
+                borderRadius: 999,
+                background: "oklch(63% 0.17 38)",
+                color: "#fff",
+              }}
+            >
+              First Timer
+            </span>
+          )}
           <span style={styleChipStyle(c.style)}>{c.style}</span>
           {c.cancelledAt && (
             <span
@@ -101,7 +115,10 @@ export function ClassRow({
         <div style={{ fontSize: 13.5, color: C.meta }}>
           {time} · {formatDuration(c.durationMin)} ·{" "}
           {c.format === "ONLINE" ? "Online" : "In person"}
-          {c.seriesId ? " · Weekly" : ""}
+          {c.seriesId ? ` · ${c.repeat ?? "Weekly"}` : ""}
+          {c.teacherName ? ` · with ${c.teacherName}` : ""}
+          {c.firstTimerSpots ? ` · ${c.firstTimerSpots} first-timer spots` : ""}
+          {c.laterSessions ? ` · ${c.laterSessions} more ${c.laterSessions === 1 ? "date" : "dates"} scheduled` : ""}
         </div>
       </div>
 

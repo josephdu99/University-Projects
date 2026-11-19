@@ -56,7 +56,9 @@ async function main() {
   await db.gamificationProfile.deleteMany();
   await db.danceClass.deleteMany();
   await db.classSeries.deleteMany();
+  await db.studioMember.deleteMany();
   await db.studio.deleteMany();
+  await db.image.deleteMany();
   await db.payoutAccount.deleteMany();
   await db.authToken.deleteMany();
   await db.loginAttempt.deleteMany();
@@ -159,6 +161,9 @@ async function main() {
       description: "Sydney's home for hip hop, heels & street styles.",
       city: "Sydney",
       address: "12 Beat St, Surry Hills",
+      suburb: "Surry Hills",
+      styles: ["Hip Hop", "Heels", "Salsa"],
+      arrive: "Green door between the bakery and the bottle shop. Up one flight.",
       timezone: SYD,
       emoji: "🏙️",
       ownerId: maria.id,
@@ -170,6 +175,8 @@ async function main() {
       description: "Latin dance studio specialising in salsa & bachata.",
       city: "Sydney",
       address: "88 Rhythm Ave, Newtown",
+      suburb: "Newtown",
+      styles: ["Salsa", "Bachata"],
       timezone: SYD,
       emoji: "🌶️",
       ownerId: diego.id,
@@ -181,11 +188,31 @@ async function main() {
       description: "Ballet, contemporary and jazz for all levels.",
       city: "Melbourne",
       address: "5 Grand Jete Ln, Fitzroy",
+      styles: ["Ballet", "Contemporary", "Jazz"],
       timezone: MEL,
       emoji: "🩰",
       ownerId: elena.id,
     },
   });
+
+  // Each studio's account holder is the first on its team, as sign-up does.
+  for (const [studio, owner] of [
+    [rhythmRoom, maria],
+    [salsaCasa, diego],
+    [barreBeyond, elena],
+  ] as const) {
+    await db.studioMember.create({
+      data: {
+        studioId: studio.id,
+        userId: owner.id,
+        name: owner.name,
+        contact: owner.email,
+        role: "OWNER",
+        status: "ACTIVE",
+        joinedAt: new Date(),
+      },
+    });
+  }
 
   // ── Past classes (attendance history for the gamification demo) ──────────
   const past = [

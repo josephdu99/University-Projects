@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { logError } from "@/lib/logger";
+import { seatsForRegulars } from "@/lib/first-timer-spots";
 
 export type BookingOutcome =
   | { ok: true; status: "BOOKED"; bookingId: string }
@@ -59,6 +60,7 @@ export async function reserveSeat(params: {
             capacity: true,
             startTime: true,
             cancelledAt: true,
+            firstTimerSpots: true,
           },
         });
 
@@ -77,11 +79,36 @@ export async function reserveSeat(params: {
           return { ok: false, reason: "You're already booked for this class." };
         }
 
-        const taken = await tx.booking.count({
+        const holders = await tx.booking.findMany({
           where: { classId, status: { in: SEAT_HOLDING } },
+          select: { userId: true },
         });
+        const taken = holders.length;
 
-        const isFull = taken >= danceClass.capacity;
+        // Seats the host keeps for first-timers are closed to regulars, who
+        // go on the waitlist once the rest are taken. (A seat freed by a
+        // cancellation goes to the head of the waitlist either way.)
+        let capacityForThem = danceClass.capacity;
+        if (danceClass.firstTimerSpots) {
+          const regular = await tx.booking.findFirst({
+            where: { userId, status: "ATTENDED" },
+            select: { id: true },
+          });
+          if (regular) {
+            const regularHolders = await tx.booking.findMany({
+              where: { userId: { in: holders.map((h) => h.userId) }, status: "ATTENDED" },
+              distinct: ["userId"],
+              select: { userId: true },
+            });
+            capacityForThem = seatsForRegulars(
+              danceClass.capacity,
+              danceClass.firstTimerSpots,
+              taken - regularHolders.length,
+            );
+          }
+        }
+
+        const isFull = taken >= capacityForThem;
         if (isFull && !allowWaitlist) {
           return { ok: false, reason: "This class is full." };
         }

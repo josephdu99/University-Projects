@@ -28,6 +28,7 @@ const STYLE_PHOTOS: { match: string[]; src: string; alt: string }[] = [
       "heels",
       "afrobeats",
       "dancehall",
+      "k-pop",
     ],
     src: "/photos/sdc-hiphop-jam.jpg",
     alt: "A hip hop class mid-routine",
@@ -42,4 +43,20 @@ const FALLBACK = {
 export function imageForStyle(style: string): { src: string; alt: string } {
   const s = style.trim().toLowerCase();
   return STYLE_PHOTOS.find((p) => p.match.includes(s)) ?? FALLBACK;
+}
+
+/**
+ * The picture for a class card: the studio's own photo when it uploaded one,
+ * otherwise the stand-in for its style. `uploaded` tells the card to show it
+ * as stored, since it was already resized on the way in.
+ */
+export function classImage(c: { style: string; photoUrl?: string | null; studioName?: string | null }): {
+  src: string;
+  alt: string;
+  uploaded: boolean;
+} {
+  if (c.photoUrl) {
+    return { src: c.photoUrl, alt: c.studioName ? `Inside ${c.studioName}` : "The studio", uploaded: true };
+  }
+  return { ...imageForStyle(c.style), uploaded: false };
 }

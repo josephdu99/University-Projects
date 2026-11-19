@@ -295,3 +295,88 @@ body {
     display: none !important;
   }
 }
+
+/* Studio and teacher sign-up, and the studio dashboard's in-page forms.
+   Fields live in a stylesheet rather than inline so focus can show. */
+.su-fld {
+  width: 100%;
+  height: 54px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1.5px solid oklch(80% 0.01 70);
+  background: oklch(99.5% 0.004 70);
+  color: oklch(22% 0.02 60);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+}
+.su-fld:focus {
+  border-color: oklch(22% 0.02 60);
+  box-shadow: 0 0 0 3px oklch(63% 0.17 38 / 0.25);
+}
+.su-fld[aria-invalid="true"] {
+  border-color: oklch(48% 0.17 30);
+}
+.su-fld:disabled {
+  background: oklch(95% 0.008 70);
+  color: oklch(45% 0.02 60);
+}
+textarea.su-fld {
+  height: auto;
+  min-height: 96px;
+  padding: 14px 16px;
+  resize: vertical;
+  line-height: 1.45;
+}
+.su-compact .su-fld {
+  height: 50px;
+  border-radius: 14px;
+  font-size: 15.5px;
+}
+.su-compact textarea.su-fld {
+  height: auto;
+  min-height: 84px;
+}
+.su-chip:focus-visible,
+.su-btn:focus-visible {
+  outline: 2px solid oklch(22% 0.02 60);
+  outline-offset: 2px;
+}
+.su-file:focus-within {
+  outline: 2px solid oklch(22% 0.02 60);
+  outline-offset: 2px;
+}
+.su-dark-pill:hover {
+  background: oklch(32% 0.02 60) !important;
+}
+.su-tint-card:hover {
+  background: oklch(91% 0.06 62) !important;
+}
+@keyframes su-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.su-panel-in {
+  animation: su-panel-in 0.25s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .su-panel-in {
+    animation: none;
+  }
+}
+
+/* The landing header's "For studios & instructors" jump needs about 230px
+   more than the header has on a phone. Below that it drops out; the section
+   it jumps to is further down the same page. */
+@media (max-width: 719px) {
+  .stepup-header-teach {
+    display: none !important;
+  }
+}

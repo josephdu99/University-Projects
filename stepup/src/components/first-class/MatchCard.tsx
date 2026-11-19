@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { C, DISPLAY } from "@/lib/marketing-theme";
 import { OPENNESS_LABEL, type ScoredClass } from "@/lib/first-class";
-import { imageForStyle } from "@/lib/class-photo";
+import { classImage } from "@/lib/class-photo";
 import type { LiveCandidate } from "./match-types";
 
 /**
@@ -17,7 +17,7 @@ export function MatchCard({
   c: ScoredClass<LiveCandidate>;
   rank: number;
 }) {
-  const img = imageForStyle(c.style);
+  const img = classImage(c);
   const seatsLeft = Math.max(0, c.capacity - c.seatsTaken);
   return (
     <Link
@@ -40,6 +40,7 @@ export function MatchCard({
           alt={img.alt}
           width={1408}
           height={768}
+          unoptimized={img.uploaded}
           sizes="(max-width: 900px) 90vw, 360px"
           style={{
             display: "block",
@@ -206,7 +207,7 @@ export function MatchRow({
 }: {
   c: ScoredClass<LiveCandidate>;
 }) {
-  const img = imageForStyle(c.style);
+  const img = classImage(c);
   return (
     <Link
       href={`/first-class/${c.id}`}
@@ -226,6 +227,7 @@ export function MatchRow({
         alt=""
         width={144}
         height={144}
+        unoptimized={img.uploaded}
         sizes="72px"
         style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }}
       />

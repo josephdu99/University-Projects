@@ -54,11 +54,14 @@ export function FunnelHeader({
   homeLabel,
   width = 1280,
   compact = false,
+  teachLink = false,
 }: {
   home: string | null;
   homeLabel: string | null;
   width?: number;
   compact?: boolean;
+  /** The landing page's jump to its "For studios and instructors" section. */
+  teachLink?: boolean;
 }) {
   return (
     <header
@@ -77,6 +80,22 @@ export function FunnelHeader({
         <Wordmark size={compact ? 20 : 24} />
       </Link>
       <div style={{ display: "flex", alignItems: "center", gap: "clamp(16px, 2.5vw, 28px)" }}>
+        {teachLink && (
+          <a
+            href="#for-teachers"
+            className="stepup-text-link stepup-header-teach"
+            style={{
+              fontWeight: 700,
+              fontSize: 12,
+              letterSpacing: "0.12em",
+              color: C.ink,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            FOR STUDIOS &amp; INSTRUCTORS
+          </a>
+        )}
         {home ? (
           <Link
             href={home}

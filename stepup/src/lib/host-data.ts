@@ -23,6 +23,13 @@ export type HostClass = {
   cancelledAt: Date | null;
   seriesId: string | null;
   booked: number;
+  /** "Weekly" or "Fortnightly" for a repeating class, else null. */
+  repeat: string | null;
+  /** Who teaches it, for a studio class with a teacher assigned. */
+  teacherName: string | null;
+  firstTimerSpots: number | null;
+  /** On the dashboard, how many more dates this repeating class has. */
+  laterSessions?: number;
 };
 
 export type Face = { id: string; name: string };
@@ -59,10 +66,43 @@ function shape(c: {
   onlineLink: string | null;
   cancelledAt: Date | null;
   seriesId: string | null;
+  firstTimerSpots: number | null;
+  series: { frequency: string } | null;
+  teacherMember: { name: string } | null;
   _count: { bookings: number };
 }): HostClass {
-  const { _count, ...rest } = c;
-  return { ...rest, booked: _count.bookings };
+  const { _count, series, teacherMember, ...rest } = c;
+  return {
+    ...rest,
+    booked: _count.bookings,
+    repeat: series ? (series.frequency === "FORTNIGHTLY" ? "Fortnightly" : "Weekly") : null,
+    teacherName: teacherMember?.name ?? null,
+  };
+}
+
+/**
+ * One row per class for the dashboard: a repeating class shows its next date
+ * and how many more follow, instead of twelve rows of the same thing. The
+ * full list of dates is on the classes page.
+ */
+export function collapseSeries(upcoming: HostClass[]): HostClass[] {
+  const out: HostClass[] = [];
+  const bySeries = new Map<string, HostClass>();
+  for (const c of upcoming) {
+    if (!c.seriesId) {
+      out.push(c);
+      continue;
+    }
+    const first = bySeries.get(c.seriesId);
+    if (first) {
+      first.laterSessions = (first.laterSessions ?? 0) + 1;
+      continue;
+    }
+    const row = { ...c, laterSessions: 0 };
+    bySeries.set(c.seriesId, row);
+    out.push(row);
+  }
+  return out;
 }
 
 /**
@@ -78,12 +118,14 @@ export async function getHostDashboard(hostId: string): Promise<HostDashboard> {
       db.danceClass.findMany({
         where: { hostId },
         include: {
+          series: { select: { frequency: true } },
+          teacherMember: { select: { name: true } },
           _count: {
             select: { bookings: { where: { status: { in: SEAT_HOLDING } } } },
           },
         },
         orderBy: { startTime: "desc" },
-        take: 200,
+        take: 300,
       }),
       db.booking.count({ where: { class: { hostId }, status: "ATTENDED" } }),
       // Faces for the check-in avatar stack: most recent attendees, deduped.
@@ -136,7 +178,9 @@ export async function getHostDashboard(hostId: string): Promise<HostDashboard> {
   return {
     upcoming,
     past,
-    hostedCount: shaped.length,
+    // Hosted means it has happened: not a date still ahead, and not one that
+    // was called off. A weekly class published today has hosted nothing.
+    hostedCount: past.filter((c) => !c.cancelledAt).length,
     checkInCount,
     checkInFaces: checkInRows.map((r) => ({
       id: r.user.id,

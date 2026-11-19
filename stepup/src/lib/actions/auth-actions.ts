@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { signIn, signOut, LOGIN_ERROR_MESSAGES } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import { SIGNUP_ROLES } from "@/lib/roles";
+import { passwordSchema } from "@/lib/password-rules";
 import { isValidTimeZone, DEFAULT_TIMEZONE } from "@/lib/time";
 import { AVATAR_COLORS, isAvatarColor } from "@/lib/avatar-colors";
 import { isAvatarMark } from "@/lib/avatar-marks";
@@ -27,15 +28,7 @@ export type FormState = { error?: string; success?: string } | undefined;
 const signUpSchema = z.object({
   name: z.string().trim().min(2, "Name is too short").max(60),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
-  password: z
-    .string()
-    .min(10, "Use at least 10 characters")
-    .max(200)
-    .refine((p) => !/^\d+$/.test(p), "Don't use only numbers")
-    .refine(
-      (p) => !["password123", "12345678910", "qwertyuiop"].includes(p.toLowerCase()),
-      "That password is too common"
-    ),
+  password: passwordSchema,
   role: z.enum(SIGNUP_ROLES),
   timezone: z.string().optional(),
   homeCity: z.string().trim().max(60).optional(),
@@ -113,6 +106,28 @@ export async function signUpAction(
         : {}),
     },
   });
+
+  // A studio's account holder is the first person on its team, so the
+  // dashboard's teacher list and class form have someone to show.
+  if (data.role === "STUDIO_OWNER") {
+    const studio = await db.studio.findUnique({
+      where: { ownerId: user.id },
+      select: { id: true },
+    });
+    if (studio) {
+      await db.studioMember.create({
+        data: {
+          studioId: studio.id,
+          userId: user.id,
+          name: user.name,
+          contact: user.email,
+          role: "OWNER",
+          status: "ACTIVE",
+          joinedAt: new Date(),
+        },
+      });
+    }
+  }
 
   // Verification is required before booking or hosting, but we sign them in
   // straight away so the app doesn't feel like a dead end while they wait.
@@ -194,6 +209,15 @@ export async function googleLoginAction() {
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/" });
+}
+
+/**
+ * Log out and come back to the page you were on, for the sign-up pages that
+ * ask a logged-in visitor to log out first. Same-site paths only.
+ */
+export async function logoutToAction(formData: FormData) {
+  const to = safeNext(formData.get("next"));
+  await signOut({ redirectTo: to === "/go" ? "/" : to });
 }
 
 // ─── Email verification ──────────────────────────────────────────────────────

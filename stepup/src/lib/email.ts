@@ -4,11 +4,15 @@ import { logInfo, logError } from "@/lib/logger";
 const FROM = process.env.EMAIL_FROM ?? "StepUp <onboarding@resend.dev>";
 
 export function appUrl(path = "") {
+  // A preview deployment (staging) links to itself, not to production, so a
+  // link in a staging email opens the staging app and its database.
   const base =
     process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "http://localhost:3000");
+    (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_BRANCH_URL
+      ? `https://${process.env.VERCEL_BRANCH_URL}`
+      : process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : "http://localhost:3000");
   return `${base.replace(/\/$/, "")}${path}`;
 }
 
@@ -259,5 +263,56 @@ export async function sendClassReminder(params: {
     text: `${heading}: ${params.classTitle}\n${when}\n${
       params.online ? "Online class." : (params.where ?? "")
     }\n\n${params.manageUrl}`,
+  });
+}
+
+/** For text other people typed that goes into an email's HTML. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * A studio's invite to a teacher. The code is in the subject line's body and
+ * the link, so it works whether they tap the link or type the code into the
+ * teacher page. Studio and person names are typed by the studio, so they are
+ * escaped before they go into the HTML.
+ */
+export async function sendTeacherInvite(params: {
+  to: string;
+  name: string;
+  studioName: string;
+  invitedBy: string;
+  role: "TEACHER" | "MANAGER";
+  code: string;
+  expiresAt: Date;
+}) {
+  const url = appUrl(`/join/${encodeURIComponent(params.code)}`);
+  const studio = escapeHtml(params.studioName);
+  const by = escapeHtml(params.invitedBy);
+  const access =
+    params.role === "MANAGER"
+      ? "As a manager you'll be able to edit the timetable and invite people too."
+      : "You'll see the classes you're teaching and who has booked them.";
+  const expires = params.expiresAt.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "long",
+    timeZone: "Australia/Sydney",
+  });
+  return send({
+    to: params.to,
+    subject: `${params.invitedBy} invited you to teach at ${params.studioName}`,
+    html: layout(
+      `Join ${studio} on StepUp`,
+      `<p>Hi ${escapeHtml(params.name)}, ${by} from ${studio} invited you to teach on StepUp.</p>
+       <p>${access}</p>
+       <p>Your invite code is <strong style="font-family:ui-monospace,monospace;font-size:17px;color:#14151a">${escapeHtml(params.code)}</strong>. It works once and runs out on ${expires}.</p>`,
+      { label: "Join the team", url },
+    ),
+    text: `${params.invitedBy} from ${params.studioName} invited you to teach on StepUp.\n\n${access}\n\nJoin here: ${url}\nYour invite code: ${params.code} (works once, runs out on ${expires}).`,
   });
 }

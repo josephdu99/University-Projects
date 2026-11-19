@@ -20,15 +20,27 @@ export function SuburbCombobox({
   value,
   studioSuburbs,
   onPick,
+  variant = "match",
+  label,
+  hint,
+  invalid = false,
 }: {
   value: string;
   studioSuburbs: string[];
   onPick: (name: string) => void;
+  /** "form" sizes it like the sign-up forms' other fields. */
+  variant?: "match" | "form";
+  label?: string;
+  /** A line under the box, tied to it with aria-describedby. */
+  hint?: string;
+  invalid?: boolean;
 }) {
+  const form = variant === "form";
   const uid = useId();
   const inputId = `${uid}-input`;
   const listId = `${uid}-list`;
   const optionId = (i: number) => `${uid}-opt-${i}`;
+  const hintId = `${uid}-hint`;
 
   const inputRef = useRef<HTMLInputElement>(null);
   // null while not editing, so the box simply shows the picked suburb.
@@ -79,17 +91,21 @@ export function SuburbCombobox({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: form ? 6 : 8, minWidth: 0 }}>
       <label
         htmlFor={inputId}
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          letterSpacing: "0.12em",
-          color: "oklch(45% 0.02 60)",
-        }}
+        style={
+          form
+            ? { fontSize: 13, fontWeight: 700 }
+            : {
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                color: "oklch(45% 0.02 60)",
+              }
+        }
       >
-        SUBURB OR POSTCODE
+        {label ?? "SUBURB OR POSTCODE"}
       </label>
       <div style={{ position: "relative" }}>
         <svg
@@ -97,7 +113,12 @@ export function SuburbCombobox({
           width="20"
           height="20"
           viewBox="0 0 20 20"
-          style={{ position: "absolute", left: 18, top: 20, pointerEvents: "none" }}
+          style={{
+            position: "absolute",
+            left: form ? 16 : 18,
+            top: form ? 17 : 20,
+            pointerEvents: "none",
+          }}
         >
           <circle cx="8.5" cy="8.5" r="6" fill="none" stroke="oklch(45% 0.02 60)" strokeWidth="2" />
           <path d="M13 13l5 5" stroke="oklch(45% 0.02 60)" strokeWidth="2" strokeLinecap="round" />
@@ -111,10 +132,12 @@ export function SuburbCombobox({
           aria-controls={listId}
           aria-expanded={open}
           aria-activedescendant={activeId}
+          aria-describedby={hint ? hintId : undefined}
+          aria-invalid={invalid || undefined}
           autoComplete="off"
           spellCheck={false}
           value={text}
-          placeholder="Start typing, e.g. Newtown or 2042"
+          placeholder={form ? "Start typing a suburb" : "Start typing, e.g. Newtown or 2042"}
           onChange={(e) => {
             const v = e.target.value;
             setDraft(v);
@@ -134,13 +157,15 @@ export function SuburbCombobox({
           onKeyDown={onKeyDown}
           style={{
             width: "100%",
-            height: 60,
-            padding: "0 56px 0 48px",
-            borderRadius: 18,
-            border: `1.5px solid ${open ? C.heroBg : C.ink}`,
+            height: form ? 54 : 60,
+            padding: form ? "0 52px 0 44px" : "0 56px 0 48px",
+            borderRadius: form ? 16 : 18,
+            border: `1.5px solid ${
+              open ? C.heroBg : invalid ? "oklch(48% 0.17 30)" : form ? "oklch(80% 0.01 70)" : C.ink
+            }`,
             background: "oklch(99.5% 0.004 70)",
-            fontSize: 18,
-            fontWeight: 600,
+            fontSize: form ? 16 : 18,
+            fontWeight: form ? 500 : 600,
             fontFamily: "inherit",
             color: C.ink,
             outline: "none",
@@ -163,10 +188,10 @@ export function SuburbCombobox({
             }}
             style={{
               position: "absolute",
-              right: 12,
-              top: 12,
-              width: 36,
-              height: 36,
+              right: form ? 10 : 12,
+              top: form ? 10 : 12,
+              width: form ? 34 : 36,
+              height: form ? 34 : 36,
               border: 0,
               borderRadius: "50%",
               background: "oklch(93% 0.01 70)",
@@ -186,7 +211,7 @@ export function SuburbCombobox({
               position: "absolute",
               left: 0,
               right: 0,
-              top: 66,
+              top: form ? 60 : 66,
               zIndex: 20,
               borderRadius: 18,
               background: "oklch(99.5% 0.004 70)",
@@ -268,6 +293,18 @@ export function SuburbCombobox({
           </div>
         )}
       </div>
+      {hint && (
+        <span
+          id={hintId}
+          style={{
+            fontSize: 13,
+            fontWeight: invalid ? 600 : 400,
+            color: invalid ? "oklch(48% 0.17 30)" : "oklch(45% 0.02 60)",
+          }}
+        >
+          {hint}
+        </span>
+      )}
     </div>
   );
 }

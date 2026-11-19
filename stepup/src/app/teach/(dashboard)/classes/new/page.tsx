@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { C } from "@/lib/marketing-theme";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { HostCreateClassPage } from "@/components/host/HostCreateClassPage";
@@ -20,13 +22,22 @@ export default async function TeachNewClassPage({
   ]);
 
   return (
-    <HostCreateClassPage
-      hostId={user.id}
-      base="/teach"
-      timezone={record.timezone}
-      canCharge={Boolean(payout?.chargesEnabled)}
-      fixedFormat="ONLINE"
-      from={from}
-    />
+    <>
+      <p style={{ margin: "0 0 18px", fontSize: 15, color: C.inkSoft }}>
+        Teaching in person?{" "}
+        <Link href="/teach/classes/first-timer" style={{ color: C.brand, fontWeight: 700 }}>
+          Create a First Timer class
+        </Link>{" "}
+        instead: beginners are matched to it by style, music and suburb.
+      </p>
+      <HostCreateClassPage
+        hostId={user.id}
+        base="/teach"
+        timezone={record.timezone}
+        canCharge={Boolean(payout?.chargesEnabled)}
+        fixedFormat="ONLINE"
+        from={from}
+      />
+    </>
   );
 }

@@ -18,7 +18,8 @@ import {
   FunnelHeader,
   FunnelFooter,
 } from "@/components/first-class/FunnelChrome";
-import { imageForStyle } from "@/lib/class-photo";
+import { classImage } from "@/lib/class-photo";
+import { partnerTag } from "@/lib/class-form";
 
 export async function generateMetadata({
   params,
@@ -61,8 +62,13 @@ export default async function FirstClassPage({
   const homeLabel = user ? SECTION_LABEL[user.role] : null;
   const openness = opennessOf(danceClass.level);
   const seatsLeft = Math.max(0, danceClass.capacity - danceClass.seatsTaken);
-  const img = imageForStyle(danceClass.style);
+  const img = classImage({
+    style: danceClass.style,
+    photoUrl: danceClass.photoUrl,
+    studioName: danceClass.studio?.name,
+  });
   const online = danceClass.format === "ONLINE";
+  const partner = partnerTag(danceClass.partner);
 
   // "Pick a night": the other upcoming sessions of this same series, which is
   // the only place in the schema where one class genuinely repeats.
@@ -134,6 +140,7 @@ export default async function FirstClassPage({
               width={1408}
               height={768}
               priority
+              unoptimized={img.uploaded}
               sizes="(max-width: 920px) 92vw, 840px"
               style={{
                 display: "block",
@@ -176,6 +183,19 @@ export default async function FirstClassPage({
               >
                 {online ? "Online, join from home" : "In person"}
               </span>
+              {partner && (
+                <span
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    background: "oklch(99.5% 0.004 70)",
+                    border: "1px solid oklch(86% 0.01 70)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {partner}
+                </span>
+              )}
               {danceClass.firstTimersBooked > 0 && (
                 <span
                   style={{
@@ -207,14 +227,15 @@ export default async function FirstClassPage({
               </h1>
               <div style={{ fontSize: 17, color: "oklch(42% 0.02 60)" }}>
                 {danceClass.studio?.name ?? danceClass.hostName}
-                {danceClass.studio?.city ? ` · ${danceClass.studio.city}` : ""} ·{" "}
+                {danceClass.studio?.city ? ` · ${danceClass.studio.city}` : ""}
+                {danceClass.studio && danceClass.teacherMember ? ` · with ${danceClass.teacherName}` : ""} ·{" "}
                 {formatDuration(danceClass.durationMin)}
               </div>
             </div>
           </div>
 
-          {/* The host, in their own words. The handoff put an invented quote
-              here; this is the description they actually wrote. */}
+          {/* The teacher, in their own words: the note to first-timers they
+              wrote on their profile, or else the class's own description. */}
           <div
             style={{
               display: "grid",
@@ -242,7 +263,16 @@ export default async function FirstClassPage({
                 color: "#fff",
               }}
             >
-              {danceClass.hostName.charAt(0).toUpperCase()}
+              {danceClass.teacherPhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- an uploaded photo, already resized
+                <img
+                  src={danceClass.teacherPhotoUrl}
+                  alt=""
+                  style={{ width: 88, height: 88, borderRadius: "50%", objectFit: "cover" }}
+                />
+              ) : (
+                danceClass.teacherName.charAt(0).toUpperCase()
+              )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div
@@ -253,7 +283,7 @@ export default async function FirstClassPage({
                   color: "oklch(78% 0.12 50)",
                 }}
               >
-                YOUR TEACHER · {danceClass.hostName.toUpperCase()}
+                YOUR TEACHER · {danceClass.teacherName.toUpperCase()}
               </div>
               <div
                 style={{
@@ -265,7 +295,11 @@ export default async function FirstClassPage({
                   textWrap: "pretty",
                 }}
               >
-                {danceClass.description}
+                {danceClass.teacherNote
+                  ? `“${danceClass.teacherNote}”`
+                  : danceClass.plan
+                    ? `A First Timer ${danceClass.style} class. It assumes nobody in the room has danced before.`
+                    : danceClass.description}
               </div>
             </div>
           </div>
@@ -302,9 +336,9 @@ export default async function FirstClassPage({
                 note={
                   online
                     ? "The joining link is on your booking once you have a seat."
-                    : (danceClass.location ??
-                      danceClass.studio?.address ??
-                      "Address is on your booking once you have a seat.")
+                    : `${danceClass.location ??
+                        danceClass.studio?.address ??
+                        "Address is on your booking once you have a seat."}${danceClass.room ? `. ${danceClass.room}` : ""}`
                 }
               />
               <ExpectCard
@@ -325,8 +359,43 @@ export default async function FirstClassPage({
                     : "Open to all levels, so beginners are expected."
                 }
               />
+              {danceClass.wear && (
+                <ExpectCard
+                  label="WHAT TO WEAR"
+                  value={danceClass.wear}
+                  note={`From ${danceClass.studio?.name ?? danceClass.teacherName}.`}
+                />
+              )}
             </div>
           </div>
+
+          {danceClass.plan && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontFamily: DISPLAY,
+                  fontWeight: 800,
+                  fontSize: "clamp(24px, 3.5vw, 40px)",
+                  letterSpacing: "-0.03em",
+                }}
+              >
+                How the hour runs
+              </h2>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 17,
+                  lineHeight: 1.6,
+                  color: "oklch(30% 0.02 60)",
+                  whiteSpace: "pre-line",
+                  maxWidth: "62ch",
+                }}
+              >
+                {danceClass.plan}
+              </p>
+            </div>
+          )}
 
           {siblings.length > 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { signUpAction } from "@/lib/actions/auth-actions";
 import { C, DISPLAY, CARD_SHADOW } from "@/lib/marketing-theme";
@@ -169,6 +170,7 @@ const eyebrowStyle: React.CSSProperties = {
 };
 
 export function GetStartedFlow({ next }: { next?: string }) {
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [intent, setIntent] = useState<Intent | null>(null);
   const [state, formAction] = useActionState(signUpAction, undefined);
@@ -350,7 +352,13 @@ export function GetStartedFlow({ next }: { next?: string }) {
 
           <button
             type="button"
-            onClick={() => intent && setStep(2)}
+            onClick={() => {
+              if (!intent) return;
+              // Studios have their own sign-up now, with the ABN check, the
+              // suburb beginners are matched on and the team that follows.
+              if (intent === "inPerson") router.push("/studios/join");
+              else setStep(2);
+            }}
             disabled={!intent}
             style={{
               marginTop: 40,

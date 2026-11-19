@@ -34,7 +34,7 @@ export default async function Home() {
 
   return (
     <FunnelPage>
-      <FunnelHeader home={home} homeLabel={homeLabel} />
+      <FunnelHeader home={home} homeLabel={homeLabel} teachLink />
 
       {/* ── HERO ───────────────────────────────────────────────────────── */}
       <div
@@ -410,6 +410,116 @@ export default async function Home() {
           </div>
         </div>
       )}
+
+      {/* ── FOR STUDIOS AND INSTRUCTORS ────────────────────────────────── */}
+      <section
+        id="for-teachers"
+        aria-labelledby="for-teachers-title"
+        style={{
+          maxWidth: 1280,
+          margin: "0 auto",
+          padding: "clamp(72px, 12vw, 150px) clamp(20px, 5vw, 64px) 0",
+          boxSizing: "border-box",
+          scrollMarginTop: 24,
+        }}
+      >
+        <div
+          style={{
+            borderRadius: 32,
+            background: "oklch(94% 0.045 65)",
+            padding: "clamp(32px, 5vw, 56px)",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+            gap: "clamp(28px, 5vw, 56px)",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: "0.14em", color: "oklch(45% 0.15 38)" }}>
+              FOR STUDIOS AND INSTRUCTORS
+            </div>
+            <h2
+              id="for-teachers-title"
+              style={{
+                margin: 0,
+                fontFamily: DISPLAY,
+                fontWeight: 800,
+                fontSize: "clamp(34px, 4.5vw, 54px)",
+                lineHeight: 1,
+                letterSpacing: "-0.04em",
+                textWrap: "balance",
+              }}
+            >
+              Teach in Sydney? Fill your classes with first-timers.
+            </h2>
+            <p style={{ margin: 0, fontSize: 17, color: "oklch(38% 0.02 60)", maxWidth: "42ch" }}>
+              List a First Timer class and we&apos;ll match you with beginners who want your style,
+              your music and your suburb.
+            </p>
+            <p style={{ margin: 0, fontSize: 15, color: "oklch(38% 0.02 60)" }}>
+              Teach at a studio? Ask your studio for an invite, or{" "}
+              <Link
+                href="/teach#invite-code"
+                style={{ fontWeight: 700, color: C.ink, textDecoration: "underline", textUnderlineOffset: 3 }}
+              >
+                enter your invite code
+              </Link>
+              .
+            </p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <Link
+              href="/studios/join"
+              className="su-dark-pill"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                padding: "22px 24px",
+                borderRadius: 24,
+                background: C.ink,
+                color: "oklch(96% 0.025 75)",
+                textDecoration: "none",
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", color: "oklch(80% 0.1 50)" }}>
+                I RUN A STUDIO
+              </span>
+              <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>
+                Sign up your studio →
+              </span>
+              <span style={{ fontSize: 15, color: "oklch(82% 0.02 70)" }}>
+                Add your studio, invite your teachers, list your timetable.
+              </span>
+            </Link>
+            <Link
+              href="/teach"
+              className="stepup-lift"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                padding: "22px 24px",
+                borderRadius: 24,
+                background: "oklch(99.5% 0.004 70)",
+                border: `1.5px solid ${C.ink}`,
+                color: C.ink,
+                textDecoration: "none",
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", color: "oklch(45% 0.15 38)" }}>
+                I TEACH INDEPENDENTLY
+              </span>
+              <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>
+                Register to teach →
+              </span>
+              <span style={{ fontSize: 15, color: "oklch(38% 0.02 60)" }}>
+                Your own classes, your own space, listed under your name.
+              </span>
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* ── CLOSING ────────────────────────────────────────────────────── */}
       <div style={{ padding: "clamp(72px, 12vw, 150px) 14px 14px" }}>

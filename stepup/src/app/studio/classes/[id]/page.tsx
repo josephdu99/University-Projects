@@ -1,4 +1,4 @@
-import { requireRole } from "@/lib/session";
+import { requireStudioAccess } from "@/lib/studio-access";
 import { RosterView } from "@/components/classes/RosterView";
 
 export default async function StudioClassRosterPage({
@@ -6,7 +6,7 @@ export default async function StudioClassRosterPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requireRole("STUDIO_OWNER");
+  const { studio } = await requireStudioAccess();
   const { id } = await params;
-  return <RosterView classId={id} hostId={user.id} basePath="/studio" />;
+  return <RosterView classId={id} hostId={studio.ownerId} basePath="/studio" />;
 }

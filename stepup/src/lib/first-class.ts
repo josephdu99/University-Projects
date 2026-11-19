@@ -87,6 +87,19 @@ export function isWhen(v: string): v is WhenId {
   return WHEN.some((w) => w.id === v);
 }
 
+/** The music written for the middle of a sentence. */
+const MUSIC_PHRASE: Record<MusicId, string> = {
+  latin: "Latin & pop",
+  hiphop: "hip hop & R&B",
+  classical: "classical & soundtracks",
+  afro: "Afrobeats & dancehall",
+  any: "anything upbeat",
+};
+
+export function musicPhrase(id: MusicId): string {
+  return MUSIC_PHRASE[id];
+}
+
 export function musicLabel(id: MusicId): string {
   return MUSIC.find((m) => m.id === id)?.label ?? "";
 }
@@ -143,6 +156,14 @@ export type CandidateClass = {
    */
   suburb: string | null;
   hostName: string;
+  /**
+   * The music the host says the class is danced to, one of the matcher's own
+   * ids. Classes listed before hosts were asked are null, and are matched on
+   * their style instead.
+   */
+  music: string | null;
+  /** The studio's own photo, when it uploaded one. */
+  photoUrl: string | null;
 };
 
 /**
@@ -201,10 +222,18 @@ export function matchesWhen(
 }
 
 export function matchesMusic(
-  c: Pick<CandidateClass, "style">,
+  c: { style: string; music?: string | null },
   music: MusicId | null,
 ): boolean {
   if (!music) return false;
+  // What the host said beats what the style usually means: a contemporary
+  // class danced to hip hop is a hip hop class to the person picking.
+  if (c.music && isMusic(c.music)) {
+    if (c.music === music) return true;
+    if (music === "any") return c.music !== "classical";
+    if (c.music === "any") return music !== "classical";
+    return false;
+  }
   const styles = MUSIC.find((m) => m.id === music)?.styles ?? [];
   return styles.includes(c.style.trim().toLowerCase());
 }
@@ -302,10 +331,15 @@ export function rankClasses<T extends CandidateClass>(
 
     if (answers.music && matchesMusic(c, answers.music)) {
       score += 2;
+      const declared = c.music && isMusic(c.music) ? c.music : null;
       reasons.push(
-        answers.music === "any"
-          ? `${c.style} is upbeat, which is what you asked for.`
-          : `${c.style} sits in the ${musicLabel(answers.music)} you picked.`,
+        declared && declared !== "any"
+          ? `It's danced to ${musicPhrase(declared)}${answers.music === declared ? ", which you picked" : ", which is upbeat"}.`
+          : answers.music === "any"
+            ? `${c.style} is upbeat, which is what you asked for.`
+            : declared === "any"
+              ? `It's danced to anything upbeat, ${musicPhrase(answers.music)} included.`
+              : `${c.style} sits in the ${musicLabel(answers.music)} you picked.`,
       );
     }
 

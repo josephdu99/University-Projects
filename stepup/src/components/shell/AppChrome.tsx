@@ -116,8 +116,10 @@ export function AppChrome({
           <nav
             style={{
               display: "flex",
+              flexWrap: "wrap",
               alignItems: "center",
-              gap: "clamp(16px, 2.5vw, 26px)",
+              columnGap: "clamp(14px, 2.5vw, 26px)",
+              rowGap: 6,
               fontSize: 15,
               fontWeight: 600,
             }}

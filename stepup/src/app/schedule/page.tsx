@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { cutoffLabel } from "@/lib/policy-copy";
+import { cutoffShort } from "@/lib/policy-copy";
 import { effectivePolicy } from "@/lib/policies";
 import { requireRole } from "@/lib/session";
 import { publicName } from "@/lib/roles";
@@ -652,7 +652,7 @@ function NextClassHero({
           >
             {phase === "now"
               ? "This class has started"
-              : `Free cancellation until ${cutoffLabel(c.startTime, c.timezone, effectivePolicy(c.cancelPolicy, c.studio?.cancelPolicy))}`}
+              : cutoffShort(c.startTime, c.timezone, effectivePolicy(c.cancelPolicy, c.studio?.cancelPolicy))}
           </div>
         </div>
       </div>

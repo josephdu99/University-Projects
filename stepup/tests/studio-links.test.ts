@@ -54,8 +54,13 @@ describe("policy copy", () => {
     const start = new Date("2026-11-20T08:00:00Z");
     expect(cutoffLabel(start, "Australia/Sydney", "STANDARD")).toBe("7:00am Fri 20 Nov");
     expect(cutoffLabel(start, "Australia/Sydney", "STRICT")).toBe("7:00pm Thu 19 Nov");
-    expect(cutoffSentence(start, "Australia/Sydney", "RELAXED")).toBe(
+    const before = new Date("2026-11-19T00:00:00Z");
+    expect(cutoffSentence(start, "Australia/Sydney", "RELAXED", before)).toBe(
       "Free cancellation until 5:00pm Fri 20 Nov (2 hours before class). After that, there's no refund.",
+    );
+    const after = new Date("2026-11-20T07:00:00Z");
+    expect(cutoffSentence(start, "Australia/Sydney", "RELAXED", after)).toBe(
+      "Free cancellation closed at 5:00pm Fri 20 Nov (2 hours before class). If you cancel now: no refund.",
     );
   });
 });

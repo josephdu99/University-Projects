@@ -12,6 +12,7 @@ import { assertNotProduction } from "../src/lib/environment";
 
 const DEMO_EMAIL_PATTERNS = [
   "@stepup.dance",
+  "@guest.stepup.dance",
   "@rhythmroom.dance",
   "@salsacasa.dance",
   "@barrebeyond.dance",
@@ -39,8 +40,10 @@ async function main() {
   const [classes, bookings, paidPayments] = await Promise.all([
     db.danceClass.count({ where: { hostId: { in: ids } } }),
     db.booking.count({ where: { userId: { in: ids } } }),
+    // Only real charges count: the seed's statement rows have no Stripe
+    // payment behind them.
     db.payment.count({
-      where: { status: "PAID", booking: { userId: { in: ids } } },
+      where: { status: "PAID", stripePaymentIntentId: { not: null }, booking: { userId: { in: ids } } },
     }),
   ]);
 

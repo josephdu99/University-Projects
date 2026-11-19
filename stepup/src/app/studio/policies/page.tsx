@@ -62,11 +62,11 @@ export default async function StudioPoliciesPage() {
         </div>
         <div>
           {terms ? (
-            <span className="sd-chip" style={{ background: "oklch(95% 0.012 70)", color: "oklch(30% 0.02 60)", fontSize: 13 }}>
+            <span className="sd-chip" style={{ background: "oklch(95% 0.012 70)", color: "oklch(30% 0.02 60)", fontSize: 13, whiteSpace: "normal", display: "inline-block" }}>
               {`Version ${terms.version} · updated ${shortDate(terms.publishedAt, tz)} · accepted by ${accepted} ${accepted === 1 ? "student" : "students"}`}
             </span>
           ) : (
-            <span className="sd-chip" style={{ background: "oklch(94% 0.06 85)", color: "oklch(40% 0.1 70)", fontSize: 13 }}>
+            <span className="sd-chip" style={{ background: "oklch(94% 0.06 85)", color: "oklch(40% 0.1 70)", fontSize: 13, whiteSpace: "normal", display: "inline-block" }}>
               No terms yet. Students book without accepting any.
             </span>
           )}

@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { checkUnsubscribe } from "@/lib/signed-links";
 import { optOutFromLink } from "@/lib/opt-out";
@@ -10,6 +11,7 @@ async function stopAction(formData: FormData) {
   "use server";
   const s = (k: string) => String(formData.get(k) ?? "");
   await optOutFromLink(s("u"), s("s"), s("sig"));
+  revalidatePath("/unsubscribe");
 }
 
 /**

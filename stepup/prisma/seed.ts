@@ -50,13 +50,31 @@ async function main() {
   // Order matters: children before parents.
   await db.auditLog.deleteMany();
   await db.processedWebhookEvent.deleteMany();
+  // Studio admin tools (flow v6.4).
+  await db.textCommand.deleteMany();
+  await db.classMessage.deleteMany();
+  await db.walkIn.deleteMany();
+  await db.passOfferRecipient.deleteMany();
+  await db.passOffer.deleteMany();
+  await db.studioPass.deleteMany();
+  await db.studioOptOut.deleteMany();
+  await db.studioCredit.deleteMany();
+  await db.termsAcceptance.deleteMany();
+  await db.studioTerms.deleteMany();
+  await db.document.deleteMany();
+  await db.courseInterest.deleteMany();
   await db.payment.deleteMany();
   await db.userBadge.deleteMany();
   await db.booking.deleteMany();
+  await db.enrolment.deleteMany();
   await db.gamificationProfile.deleteMany();
   await db.danceClass.deleteMany();
   await db.classSeries.deleteMany();
   await db.studioMember.deleteMany();
+  await db.studioPhoto.deleteMany();
+  await db.venue.deleteMany();
+  await db.levelName.deleteMany();
+  await db.classTemplate.deleteMany();
   await db.studio.deleteMany();
   await db.image.deleteMany();
   await db.payoutAccount.deleteMany();
@@ -323,6 +341,228 @@ async function main() {
     ],
   });
 
+
+  // ── Salsa Casa runs the full studio toolkit (flow v6.4) ───────────────────
+  // A partner class with per-role caps and a follows waitlist, a free trial,
+  // a course opening soon, past classes with attendance, no-shows and a
+  // walk-in, terms students have accepted, a pass, a saved venue, mapped
+  // levels, a template, a teacher with a verified Working With Children
+  // Check, and this month's bookings on the statement.
+  await db.studio.update({
+    where: { id: salsaCasa.id },
+    data: {
+      cancelPolicy: "STANDARD",
+      payoutDay: "THU",
+      description: "Latin dance studio in Newtown. Salsa and bachata for people who've never danced, taught by people who remember what that's like.",
+      profileApprovedAt: new Date(),
+      healthFormUrl: "https://example.com/salsa-casa-health-form",
+    },
+  });
+  const maya = await mkUser("maya@salsacasa.dance", "Maya Torres", "INSTRUCTOR", {
+    homeCity: "Sydney",
+    timezone: SYD,
+    phone: "0412000111",
+    avatarColor: "#E0479E",
+  });
+  const mayaMember = await db.studioMember.create({
+    data: {
+      studioId: salsaCasa.id,
+      userId: maya.id,
+      name: "Maya Torres",
+      contact: maya.email,
+      role: "TEACHER",
+      status: "ACTIVE",
+      joinedAt: new Date(),
+      wwccNumber: "WWC1234567E",
+      wwccExpiry: new Date(Date.now() + 400 * 24 * 60 * 60 * 1000),
+      wwccVerifiedAt: new Date(),
+      wwccVerifiedById: diego.id,
+    },
+  });
+  await db.studioMember.create({
+    data: {
+      studioId: salsaCasa.id,
+      name: "Tom Reyes",
+      contact: "0412000222",
+      role: "MANAGER",
+      status: "INVITED",
+      inviteCode: "SALSA-DEMO-7Q",
+      inviteExpiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+    },
+  });
+  const hall = await db.venue.create({
+    data: { studioId: salsaCasa.id, name: "Newtown Hall", address: "1 Bedford St, Newtown", suburb: "Newtown" },
+  });
+  await db.levelName.createMany({
+    data: [
+      { studioId: salsaCasa.id, name: "Level 1", scale: "ABSOLUTE_BEGINNER" },
+      { studioId: salsaCasa.id, name: "Level 2", scale: "IMPROVER" },
+    ],
+  });
+  await db.classTemplate.create({
+    data: {
+      studioId: salsaCasa.id,
+      style: "Salsa",
+      scale: "BEGINNER",
+      description: "Salsa On1 for beginners. The basic, a right turn and how to lead or follow it, slowly, then to music.",
+      wear: "Anything comfy. Shoes that turn, or socks.",
+      plan: "0–15 min: the basic on your own. 15–40 min: one turn with a partner. 40–60 min: put it to music.",
+    },
+  });
+  const terms = await db.studioTerms.create({
+    data: { studioId: salsaCasa.id, version: 1, mode: "TEMPLATE", publishedAt: at(-30, "10:00") },
+  });
+  const pass = await db.studioPass.create({
+    data: { studioId: salsaCasa.id, name: "10-class pass", priceCents: 18000 },
+  });
+
+  // More dancers, booked as guests would be: name, email, mobile.
+  const guestNames = ["Lena Park", "Omar Said", "Ruby Chen", "Tom Hale", "Ivy Moss", "Ben Cole", "Zara Ali", "Kai Wong", "Nina Ross", "Leo Grant"];
+  const guests = [];
+  for (const [i, name] of guestNames.entries()) {
+    guests.push(
+      await db.user.create({
+        data: {
+          email: `${name.split(" ")[0].toLowerCase()}@guest.stepup.dance`,
+          name,
+          role: "STUDENT",
+          timezone: SYD,
+          phone: `04120003${String(i).padStart(2, "0")}`,
+          profile: { create: {} },
+        },
+      }),
+    );
+  }
+
+  const casaClass = (data: Record<string, unknown>) =>
+    db.danceClass.create({
+      data: {
+        style: "Salsa",
+        format: "IN_PERSON",
+        level: "BEGINNER",
+        timezone: SYD,
+        durationMin: 60,
+        capacity: 20,
+        stepupSpots: 8,
+        points: 25,
+        hostId: diego.id,
+        studioId: salsaCasa.id,
+        teacherMemberId: mayaMember.id,
+        location: "88 Rhythm Ave, Newtown",
+        suburb: "Newtown",
+        music: "latin",
+        description: "Salsa On1 for beginners. The basic, a right turn and how to lead or follow it.",
+        ...data,
+      } as never,
+    });
+
+  // Partner class tomorrow: 4 leads, 6/6 follows, two follows waiting.
+  const partner = await casaClass({
+    title: "Bachata Partnerwork",
+    style: "Bachata",
+    startTime: at(1, "19:30"),
+    capacity: 16,
+    stepupSpots: 12,
+    partner: "ROTATE",
+    partnerRule: "CAPS",
+    leadCap: 6,
+    followCap: 6,
+  });
+  const roles = ["LEAD", "LEAD", "LEAD", "LEAD", "FOLLOW", "FOLLOW", "FOLLOW", "FOLLOW", "FOLLOW", "FOLLOW"];
+  for (const [i, role] of roles.entries()) {
+    await db.booking.create({
+      data: { userId: guests[i].id, classId: partner.id, role, note: i === 0 ? "First time ever, coming with Omar" : null },
+    });
+  }
+  await db.booking.createMany({
+    data: [
+      { userId: alex.id, classId: partner.id, role: "FOLLOW", status: "WAITLISTED", waitlistPosition: 1 },
+      { userId: jordan.id, classId: partner.id, role: "FOLLOW", status: "WAITLISTED", waitlistPosition: 2 },
+    ],
+  });
+  await db.classMessage.create({
+    data: { classId: partner.id, senderId: diego.id, body: "Heads up: we're in Studio B tonight.", recipients: 10, channels: "EMAIL" },
+  });
+
+  // A free trial and a paid drop-in this week.
+  await casaClass({ title: "Free Salsa Trial", startTime: at(3, "18:30"), listing: "TRIAL", level: "ABSOLUTE_BEGINNER" });
+  const dropIn = await casaClass({ title: "Salsa Foundations", startTime: at(4, "19:00"), priceCents: 2500, venueId: hall.id, location: "1 Bedford St, Newtown" });
+
+  // An 8-week course that opens in 10 days.
+  const courseStart = at(10, "19:00");
+  const course = await db.classSeries.create({
+    data: {
+      title: "Salsa Beginners Course",
+      style: "Salsa",
+      description: "Eight weeks from your first basic to dancing a full song socially.",
+      format: "IN_PERSON",
+      level: "BEGINNER",
+      location: "88 Rhythm Ave, Newtown",
+      suburb: "Newtown",
+      timezone: SYD,
+      durationMin: 60,
+      capacity: 20,
+      stepupSpots: 10,
+      priceCents: 0,
+      listing: "COURSE",
+      music: "latin",
+      partner: "ROTATE",
+      hostId: diego.id,
+      studioId: salsaCasa.id,
+      teacherMemberId: mayaMember.id,
+      dayOfWeek: courseStart.getUTCDay(),
+      localTime: "19:00",
+      frequency: "WEEKLY",
+      startsOn: courseStart,
+      endsOn: at(10 + 7 * 7, "19:00"),
+      courseWeeks: 8,
+      coursePriceCents: 16000,
+    } as never,
+  });
+  for (let w = 0; w < 8; w++) {
+    await casaClass({
+      title: "Salsa Beginners Course",
+      startTime: at(10 + 7 * w, "19:00"),
+      listing: "COURSE",
+      seriesId: course.id,
+      capacity: 20,
+      stepupSpots: 10,
+    });
+  }
+
+  // Two past classes with attendance, a no-show and a walk-in, and the
+  // payments that show on this month's statement.
+  for (const [k, d] of [-14, -7].entries()) {
+    const c = await casaClass({ title: "Salsa Foundations", startTime: at(d, "19:00"), priceCents: 2500 });
+    for (let i = 0; i < 6; i++) {
+      const g = guests[(i + k * 2) % guests.length];
+      const noShow = k === 1 && i === 5;
+      const b = await db.booking.create({ data: { userId: g.id, classId: c.id } });
+      if (noShow) {
+        await db.booking.update({ where: { id: b.id }, data: { status: "NO_SHOW", noShowAt: at(d, "20:00") } });
+      } else {
+        await recordAttendance(b.id, at(d, "19:05"));
+      }
+      await db.payment.create({
+        data: { bookingId: b.id, status: "PAID", amountCents: 2500, feeCents: 250, paidAt: at(d - 2, "12:00") },
+      });
+      await db.termsAcceptance.create({
+        data: { userId: g.id, studioId: salsaCasa.id, termsId: terms.id, version: 1, acceptedAt: at(d - 2, "12:00") },
+      }).catch(() => {});
+    }
+    if (k === 1) await db.walkIn.create({ data: { classId: c.id, name: "Sofia (door)", role: null } });
+  }
+  // One refund this month.
+  const refunded = await db.booking.create({
+    data: { userId: guests[9].id, classId: dropIn.id, status: "CANCELLED", cancelledAt: at(-1, "09:00") },
+  });
+  await db.payment.create({
+    data: { bookingId: refunded.id, status: "REFUNDED", amountCents: 2500, feeCents: 250, paidAt: at(-3, "12:00"), refundedAt: at(-1, "09:00") },
+  });
+  await db.passOffer.create({
+    data: { studioId: salsaCasa.id, passId: pass.id, message: "Thanks for dancing with us! Our 10-class pass is $180.", audience: "FIRST", recipients: 3, createdAt: at(-5, "10:00") },
+  });
+
   console.log(`
 Seed complete.
 
@@ -330,7 +570,7 @@ Seed complete.
 
   Admin        admin@stepup.dance
   Studios      maria@rhythmroom.dance, diego@salsacasa.dance, elena@barrebeyond.dance
-  Instructors  jay@stepup.dance, noor@stepup.dance
+  Instructors  jay@stepup.dance, noor@stepup.dance, maya@salsacasa.dance (teaches at Salsa Casa)
   Dancers      alex@stepup.dance (rich history), sam@, priya@, chris@ (new), jordan@
   Admin id     ${admin.id}
 `);

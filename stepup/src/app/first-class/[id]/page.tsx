@@ -23,7 +23,7 @@ import { partnerTag } from "@/lib/class-form";
 import { roleLimitsOf } from "@/lib/booking";
 import { scaleLabel } from "@/lib/levels";
 import { nextTermStart } from "@/lib/listing";
-import { cutoffLabel } from "@/lib/policy-copy";
+import { cutoffShort } from "@/lib/policy-copy";
 import { neededChip } from "@/lib/partner-roles";
 import { toFormFields } from "@/lib/time";
 import { RolesCard, PolicyCard, CourseCard } from "@/components/first-class/ClassExtras";
@@ -585,7 +585,7 @@ export default async function FirstClassPage({
                 {courseStarted
                   ? `This term has started.${danceClass.series ? ` Next term starts ${nextTermLabel(danceClass.series.startsOn, weeks)}.` : ""}`
                   : seatsLeft > 0
-                    ? `Free cancellation until ${cutoffLabel(danceClass.startTime, tz, danceClass.policy)}.`
+                    ? cutoffShort(danceClass.startTime, tz, danceClass.policy)
                     : isCourse
                       ? "This course is full."
                       : "Full. Join the waitlist and we'll email if a seat opens."}

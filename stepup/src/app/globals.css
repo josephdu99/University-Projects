@@ -520,6 +520,8 @@ textarea.su-fld {
 }
 .sd-scroll-x {
   overflow-x: auto;
+  /* Keeps visually hidden labels inside it from widening the page. */
+  position: relative;
 }
 .sd-radio-card {
   display: flex;
@@ -564,6 +566,8 @@ textarea.su-fld {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;

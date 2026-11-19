@@ -378,7 +378,7 @@ export function CreateClassV2({
           </Group>
 
           <Group legend="Spots, price and policy" size={17}>
-            <Grid min={160} gap={12}>
+            <Grid min={200} gap={12}>
               <Field label="Room capacity">
                 <input className="su-fld" type="number" min={2} max={80} value={d.cap} onChange={text("cap")} />
               </Field>

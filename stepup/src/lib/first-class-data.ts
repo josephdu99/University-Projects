@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import type { CandidateClass } from "@/lib/first-class";
 import { findSuburb, suburbFromAddress } from "@/lib/suburbs";
 import { imageUrl } from "@/lib/images";
+import { studioTierRanks } from "@/lib/studio-profile";
 
 const SEAT_HOLDING = ["BOOKED", "ATTENDED", "PENDING_PAYMENT"];
 
@@ -20,13 +21,18 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
     where: {
       startTime: { gte: new Date() },
       cancelledAt: null,
-      level: { in: ["BEGINNER", "ALL_LEVELS"] },
+      level: { in: ["ABSOLUTE_BEGINNER", "BEGINNER", "ALL_LEVELS"] },
+      // Not classes a studio keeps off StepUp, and not kids' classes, which
+      // a guardian books (not open yet).
+      listing: { not: "HIDDEN" },
+      kids: false,
     },
     orderBy: { startTime: "asc" },
     // Repeating classes have a dozen dated sessions each; enough rows to
     // still have sixty different classes once those are folded together.
     take: 400,
     include: {
+      series: { select: { startsOn: true } },
       host: { select: { name: true, displayName: true } },
       studio: {
         select: { name: true, city: true, address: true, suburb: true, photoId: true, suspendedAt: true },
@@ -44,6 +50,9 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
   const seenSeries = new Set<string>();
   const live = classes
     .filter((c) => !c.studio || c.studio.suspendedAt === null)
+    // A course is enrolled in as a whole, so it's offered only before it
+    // starts, at its first class.
+    .filter((c) => c.listing !== "COURSE" || (c.series && c.startTime.getTime() === c.series.startsOn.getTime()))
     .filter((c) => {
       if (!c.seriesId) return true;
       if (seenSeries.has(c.seriesId)) return false;
@@ -69,6 +78,8 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
         ).map((b) => b.userId),
   );
 
+  const tiers = await studioTierRanks(live.flatMap((c) => (c.studioId ? [c.studioId] : [])));
+
   return live.map((c) => ({
     id: c.id,
     title: c.title,
@@ -90,6 +101,7 @@ export async function getBeginnerClasses(): Promise<CandidateClass[]> {
     hostName: c.host.displayName?.trim() || c.host.name,
     music: c.music,
     photoUrl: imageUrl(c.studio?.photoId),
+    tierRank: c.studioId ? (tiers.get(c.studioId) ?? 0) : 0,
   }));
 }
 
@@ -213,10 +225,16 @@ export async function getPublicClass(id: string) {
  * Other beginner-friendly classes to offer next, nearest in time first.
  * Used after a booking and after a class, where the handoff offers "try this
  * next" cards. Same style first, then anything else a beginner can join.
+ *
+ * Same studio only, under the Studio Data Promise: StepUp never markets other
+ * studios to a student because they booked with this one. For an independent
+ * teacher's class, the same teacher's other classes.
  */
 export async function getNextOptions(params: {
   excludeClassId: string;
   style: string;
+  studioId: string | null;
+  hostId: string;
   take?: number;
 }) {
   const rows = await db.danceClass.findMany({
@@ -224,7 +242,9 @@ export async function getNextOptions(params: {
       id: { not: params.excludeClassId },
       startTime: { gte: new Date() },
       cancelledAt: null,
-      level: { in: ["BEGINNER", "ALL_LEVELS"] },
+      listing: { notIn: ["HIDDEN", "COURSE"] },
+      kids: false,
+      ...(params.studioId ? { studioId: params.studioId } : { hostId: params.hostId, studioId: null }),
     },
     orderBy: { startTime: "asc" },
     take: 24,

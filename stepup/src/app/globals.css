@@ -380,3 +380,208 @@ textarea.su-fld {
     display: none !important;
   }
 }
+
+/* ── Studio dashboard (flow v6.4): shared pieces for its six tabs ─────────── */
+.sd-card {
+  background: oklch(99% 0.005 70);
+  border: 1px solid oklch(90% 0.01 70);
+  border-radius: 24px;
+}
+.sd-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: oklch(50% 0.16 35);
+  text-transform: uppercase;
+}
+.sd-h1 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: clamp(30px, 4.5vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 4px 0 0;
+}
+.sd-h2 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: clamp(22px, 3vw, 26px);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.sd-h3 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  margin: 0;
+}
+.sd-hint {
+  font-size: 13px;
+  color: oklch(46% 0.02 60);
+}
+.sd-err {
+  font-size: 13px;
+  font-weight: 600;
+  color: oklch(48% 0.17 30);
+}
+.sd-btn,
+.sd-btn-ghost,
+.sd-btn-dash {
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+  border-radius: 999px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.sd-btn {
+  border: 0;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 13px 22px;
+  background: oklch(22% 0.02 60);
+  color: oklch(97% 0.01 70);
+}
+.sd-btn:hover {
+  background: oklch(32% 0.02 60);
+  color: oklch(97% 0.01 70);
+}
+.sd-btn-ghost {
+  font-weight: 600;
+  font-size: 14.5px;
+  padding: 11px 18px;
+  border: 1px solid oklch(84% 0.012 70);
+  background: transparent;
+  color: oklch(30% 0.02 60);
+}
+.sd-btn-ghost:hover {
+  border-color: oklch(66% 0.19 35);
+  color: oklch(45% 0.19 35);
+}
+.sd-btn-dash {
+  font-weight: 700;
+  font-size: 14.5px;
+  padding: 10px 18px;
+  border: 1.5px dashed oklch(22% 0.02 60);
+  background: transparent;
+  color: oklch(22% 0.02 60);
+}
+.sd-btn:disabled,
+.sd-btn-ghost:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.sd-btn:focus-visible,
+.sd-btn-ghost:focus-visible,
+.sd-btn-dash:focus-visible {
+  outline: 2px solid oklch(66% 0.19 35);
+  outline-offset: 2px;
+}
+.sd-chip {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.sd-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.sd-tbl th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: oklch(46% 0.02 60);
+  text-transform: uppercase;
+  padding: 10px 14px;
+  border-bottom: 1px solid oklch(90% 0.01 70);
+  white-space: nowrap;
+}
+.sd-tbl td {
+  padding: 11px 14px;
+  border-bottom: 1px solid oklch(94% 0.008 70);
+  vertical-align: top;
+}
+.sd-tbl .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sd-tbl tfoot td {
+  font-weight: 700;
+  border-top: 1.5px solid oklch(22% 0.02 60);
+  border-bottom: 0;
+}
+.sd-scroll-x {
+  overflow-x: auto;
+}
+.sd-radio-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1.5px solid oklch(86% 0.012 70);
+  background: oklch(99.5% 0.004 70);
+}
+.sd-radio-card:has(input:checked) {
+  border-color: oklch(58% 0.19 35);
+  background: oklch(96% 0.04 45);
+}
+.sd-radio-card:has(input:focus-visible) {
+  outline: 2px solid oklch(22% 0.02 60);
+  outline-offset: 2px;
+}
+.sd-radio-card input {
+  margin: 3px 0 0;
+  width: 18px;
+  height: 18px;
+  accent-color: oklch(58% 0.19 35);
+  flex-shrink: 0;
+}
+.sd-check {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+  font-size: 15px;
+}
+.sd-check input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: oklch(58% 0.19 35);
+  flex-shrink: 0;
+}
+.sd-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Printing a class list or a statement: just the sheet, on white. */
+@media print {
+  .no-print,
+  header,
+  nav {
+    display: none !important;
+  }
+  body,
+  main {
+    background: #fff !important;
+  }
+  .sd-card {
+    border-color: #999 !important;
+    break-inside: avoid;
+  }
+}

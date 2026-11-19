@@ -121,7 +121,7 @@ export function whenLabel(id: WhenId): string {
 export type Openness = "first-timer" | "all-levels";
 
 export function opennessOf(level: string): Openness | null {
-  if (level === "BEGINNER") return "first-timer";
+  if (level === "BEGINNER" || level === "ABSOLUTE_BEGINNER") return "first-timer";
   if (level === "ALL_LEVELS") return "all-levels";
   return null;
 }
@@ -164,6 +164,11 @@ export type CandidateClass = {
   music: string | null;
   /** The studio's own photo, when it uploaded one. */
   photoUrl: string | null;
+  /**
+   * How complete the studio's profile is, as a ranking tier: 0 standard,
+   * 1 Featured, 2 Elite. Breaks ties between equally good matches.
+   */
+  tierRank?: number;
 };
 
 /**
@@ -392,6 +397,7 @@ export function rankClasses<T extends CandidateClass>(
   return scored.sort(
     (a, b) =>
       b.score - a.score ||
+      (b.tierRank ?? 0) - (a.tierRank ?? 0) ||
       firstTimerFirst(a.openness) - firstTimerFirst(b.openness) ||
       a.startTime.getTime() - b.startTime.getTime() ||
       a.title.localeCompare(b.title),

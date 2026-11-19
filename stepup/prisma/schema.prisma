@@ -17,8 +17,8 @@ datasource db {
 //                classes) and/or on a studio team via StudioMember
 // ADMIN        - platform staff; moderation and support tooling
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String  @id @default(cuid())
+  email        String  @unique
   // Null for an account that has never had a password set: a guest who
   // booked without signing up, or a Google-only sign-in. Both claim the
   // account by setting one through the password-reset flow.
@@ -32,9 +32,9 @@ model User {
   bio          String?
   homeCity     String?
   // IANA zone (e.g. "Australia/Sydney"). Used to render times for this user.
-  timezone     String    @default("Australia/Sydney")
-  avatarEmoji  String    @default("🕺")
-  avatarColor  String    @default("#FC5200")
+  timezone     String  @default("Australia/Sydney")
+  avatarEmoji  String  @default("🕺")
+  avatarColor  String  @default("#FC5200")
   // Independent instructors use a line-art mark on a coloured disc instead
   // of initials or an emoji. Null for everyone else, who keep initials.
   avatarMark   String?
@@ -70,6 +70,15 @@ model User {
   studio        Studio?              @relation("StudioOwner")
   memberships   StudioMember[]       @relation("MemberUser")
   invitesSent   StudioMember[]       @relation("MemberInvitedBy")
+  wwccVerified  StudioMember[]       @relation("WwccVerifiedBy")
+  termsAccepted TermsAcceptance[]
+  credits       StudioCredit[]
+  enrolments    Enrolment[]
+  studioOptOuts StudioOptOut[]
+  passOffersGot PassOfferRecipient[]
+  messagesSent  ClassMessage[]
+  textCommands  TextCommand[]
+  venues        Venue[]
   hostedClasses DanceClass[]         @relation("ClassHost")
   hostedSeries  ClassSeries[]        @relation("SeriesHost")
   bookings      Booking[]
@@ -106,10 +115,10 @@ model AuthToken {
 // Rolling record of sign-in attempts, used to lock out brute-force attackers.
 // Keyed by email (not user) so attempts against unknown accounts still count.
 model LoginAttempt {
-  id         String   @id @default(cuid())
-  email      String
-  ipHash     String?
-  successful Boolean  @default(false)
+  id          String   @id @default(cuid())
+  email       String
+  ipHash      String?
+  successful  Boolean  @default(false)
   attemptedAt DateTime @default(now())
 
   @@index([email, attemptedAt])
@@ -119,14 +128,14 @@ model LoginAttempt {
 // ─── Studios & payouts ───────────────────────────────────────────────────────
 
 model Studio {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   name        String
   description String
   city        String
   address     String
   // IANA zone the studio's local class times are expressed in.
-  timezone    String   @default("Australia/Sydney")
-  emoji       String   @default("🏢")
+  timezone    String @default("Australia/Sydney")
+  emoji       String @default("🏢")
 
   // Australian Business Number, 11 digits, checked against the ABN checksum
   // at sign-up. Null for studios that joined before it was asked for.
@@ -140,6 +149,28 @@ model Studio {
   photoId String?  @unique
   photo   Image?   @relation("StudioPhoto", fields: [photoId], references: [id], onDelete: SetNull)
 
+  // Late cancellation preset every class uses unless it overrides it.
+  // CANCEL POLICY: "RELAXED" | "STANDARD" | "STRICT"
+  cancelPolicy  String  @default("STANDARD")
+  // The weekday Stripe pays the studio out on. "MON" … "FRI".
+  payoutDay     String  @default("THU")
+  kidsClasses   Boolean @default(false)
+  // StepUp collects no health information; a studio that needs it links its
+  // own form, which students are sent to.
+  healthFormUrl String?
+
+  // Concierge onboarding: StepUp drafts the profile (bio, styles, photos)
+  // from the studio's website and Instagram, and the studio approves it.
+  draftBio          String?
+  draftStyles       String[]  @default([])
+  draftPreparedAt   DateTime?
+  profileApprovedAt DateTime?
+
+  // Pass offer sent automatically the day after a student's first class.
+  passOfferAuto    Boolean @default(false)
+  passOfferPassId  String?
+  passOfferMessage String?
+
   suspendedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -150,9 +181,20 @@ model Studio {
   ownerId String @unique
   owner   User   @relation("StudioOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  classes DanceClass[]
-  series  ClassSeries[]
-  members StudioMember[]
+  classes        DanceClass[]
+  series         ClassSeries[]
+  members        StudioMember[]
+  photos         StudioPhoto[]
+  venues         Venue[]
+  levelNames     LevelName[]
+  templates      ClassTemplate[]
+  terms          StudioTerms[]
+  termsAccepted  TermsAcceptance[]
+  passes         StudioPass[]
+  passOffers     PassOffer[]
+  optOuts        StudioOptOut[]
+  credits        StudioCredit[]
+  courseInterest CourseInterest[]
 
   @@index([city])
 }
@@ -173,6 +215,16 @@ model StudioMember {
   // Whether this person can be picked as a class's teacher. Always true for
   // teachers; the owner turns it on with "I teach classes here too".
   teaches Boolean @default(true)
+
+  // Working With Children Check, needed to teach a kids' class. NSW has no
+  // public API for it: the studio checks the number on the Office of the
+  // Children's Guardian site and records here that it did, and when.
+  wwccNumber       String?
+  wwccExpiry       DateTime?
+  wwccVerifiedAt   DateTime?
+  wwccVerifiedById String?
+  wwccVerifiedBy   User?     @relation("WwccVerifiedBy", fields: [wwccVerifiedById], references: [id], onDelete: SetNull)
+  wwccReminderAt   DateTime?
 
   // Random, single use and expiring. Cleared once someone joins with it, so a
   // code that leaks after use opens nothing.
@@ -209,8 +261,291 @@ model Image {
   bytes       Bytes
   createdAt   DateTime @default(now())
 
-  studio Studio? @relation("StudioPhoto")
-  user   User?   @relation("UserPhoto")
+  studio      Studio?      @relation("StudioPhoto")
+  user        User?        @relation("UserPhoto")
+  studioPhoto StudioPhoto?
+}
+
+// An uploaded PDF (a studio's own terms), checked to really be a PDF.
+model Document {
+  id          String   @id @default(cuid())
+  filename    String
+  contentType String
+  bytes       Bytes
+  createdAt   DateTime @default(now())
+
+  terms StudioTerms[]
+}
+
+// A studio's gallery. `draft` photos belong to the concierge draft and go
+// live when the studio approves it.
+model StudioPhoto {
+  id        String   @id @default(cuid())
+  sort      Int      @default(0)
+  draft     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  imageId  String @unique
+  image    Image  @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@index([studioId, sort])
+}
+
+// A saved place to hold a class: a hall a studio hires, or an independent
+// teacher's usual spots. A studio's own address is always available and
+// isn't stored here.
+model Venue {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  suburb    String?
+  createdAt DateTime @default(now())
+
+  studioId String?
+  studio   Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  classes DanceClass[]
+  series  ClassSeries[]
+
+  @@index([studioId])
+  @@index([userId])
+}
+
+// A studio's own level name, mapped once onto StepUp's shared scale.
+// SCALE: "ABSOLUTE_BEGINNER" | "BEGINNER" | "IMPROVER" | "INTERMEDIATE" | "ADVANCED"
+model LevelName {
+  id        String   @id @default(cuid())
+  name      String
+  scale     String
+  createdAt DateTime @default(now())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  @@index([studioId])
+}
+
+// A studio's own wording for a style at a level, so a new class never starts
+// blank. Missing ones fall back to StepUp's starting template.
+model ClassTemplate {
+  id          String   @id @default(cuid())
+  style       String
+  scale       String
+  description String
+  wear        String
+  plan        String
+  updatedAt   DateTime @updatedAt
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  @@unique([studioId, style, scale])
+}
+
+// One published version of a studio's terms. Students accept each version
+// once; publishing a new one asks them again at their next booking.
+// MODE: "TEMPLATE" | "UPLOAD"
+model StudioTerms {
+  id           String   @id @default(cuid())
+  version      Int
+  mode         String
+  waiver       Boolean  @default(true)
+  conduct      Boolean  @default(true)
+  cancellation Boolean  @default(true)
+  publishedAt  DateTime @default(now())
+
+  studioId   String
+  studio     Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  documentId String?
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  acceptances TermsAcceptance[]
+
+  @@unique([studioId, version])
+}
+
+model TermsAcceptance {
+  id         String   @id @default(cuid())
+  version    Int
+  acceptedAt DateTime @default(now())
+
+  userId   String
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioId String
+  studio   Studio      @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  termsId  String
+  terms    StudioTerms @relation(fields: [termsId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, termsId])
+  @@index([userId, studioId])
+}
+
+// One of the studio's own passes or memberships. StepUp doesn't sell these:
+// a pass offer points students at the studio, and there's no commission.
+model StudioPass {
+  id         String    @id @default(cuid())
+  name       String
+  priceCents Int
+  link       String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  offers PassOffer[]
+}
+
+// AUDIENCE: "FIRST" (after their first class) | "ALL" | "AUTO" (sent the day
+// after one student's first class)
+model PassOffer {
+  id         String   @id @default(cuid())
+  message    String
+  audience   String
+  recipients Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  studioId String
+  studio   Studio     @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  passId   String
+  pass     StudioPass @relation(fields: [passId], references: [id], onDelete: Cascade)
+
+  sentTo PassOfferRecipient[]
+}
+
+model PassOfferRecipient {
+  id     String   @id @default(cuid())
+  sentAt DateTime @default(now())
+
+  offerId String
+  offer   PassOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, userId])
+  @@index([userId])
+}
+
+// A student who has asked a studio to stop marketing to them.
+model StudioOptOut {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([studioId, userId])
+}
+
+// Credit from a late cancellation under the Standard policy. It's held with
+// the class's host (a studio's account hosts all its classes, so this is
+// credit at that studio) and pays for a later class there that costs no more
+// than it's worth.
+model StudioCredit {
+  id          String    @id @default(cuid())
+  amountCents Int
+  currency    String    @default("aud")
+  reason      String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hostId   String
+  studioId String?
+  studio   Studio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
+
+  fromBookingId   String? @unique
+  usedByBookingId String? @unique
+
+  @@index([userId, hostId])
+}
+
+// A whole course bought in one go: one booking per session, one payment.
+// STATUS: "PENDING_PAYMENT" | "ENROLLED" | "CANCELLED"
+model Enrolment {
+  id          String    @id @default(cuid())
+  status      String    @default("PENDING_PAYMENT")
+  createdAt   DateTime  @default(now())
+  cancelledAt DateTime?
+
+  userId   String
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seriesId String
+  series   ClassSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  bookings Booking[]
+
+  @@unique([userId, seriesId])
+}
+
+// "Tell me when it opens" on a course that has already started.
+model CourseInterest {
+  id         String    @id @default(cuid())
+  style      String
+  email      String
+  notifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  @@unique([studioId, style, email])
+}
+
+// "Message class": everything sent to a class, kept so managers can see it.
+model ClassMessage {
+  id         String   @id @default(cuid())
+  body       String
+  recipients Int
+  channels   String
+  createdAt  DateTime @default(now())
+
+  classId  String
+  class    DanceClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  senderId String?
+  sender   User?      @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([classId, createdAt])
+}
+
+// Someone added at the door, so the head count stays right. Not a StepUp
+// booking: no account, no payment, no commission.
+model WalkIn {
+  id        String   @id @default(cuid())
+  name      String
+  role      String?
+  createdAt DateTime @default(now())
+
+  classId String
+  class   DanceClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@index([classId])
+}
+
+// A teacher's text ("cancel thu salsa") waiting for them to reply YES.
+// KIND: "CANCEL" | "MESSAGE" | "MOVE"   STATUS: "PENDING" | "DONE" | "EXPIRED"
+model TextCommand {
+  id        String   @id @default(cuid())
+  kind      String
+  payload   String
+  status    String   @default("PENDING")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId  String
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classId String
+  class   DanceClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
 }
 
 // Stripe Connect (Express) account for a host, so class fees are paid out to
@@ -218,14 +553,14 @@ model Image {
 //
 // STATUS: "PENDING" | "ONBOARDING" | "ACTIVE" | "RESTRICTED"
 model PayoutAccount {
-  id              String   @id @default(cuid())
-  stripeAccountId String   @unique
-  status          String   @default("PENDING")
-  chargesEnabled  Boolean  @default(false)
-  payoutsEnabled  Boolean  @default(false)
+  id               String  @id @default(cuid())
+  stripeAccountId  String  @unique
+  status           String  @default("PENDING")
+  chargesEnabled   Boolean @default(false)
+  payoutsEnabled   Boolean @default(false)
   detailsSubmitted Boolean @default(false)
-  country         String   @default("AU")
-  defaultCurrency String   @default("aud")
+  country          String  @default("AU")
+  defaultCurrency  String  @default("aud")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -251,19 +586,35 @@ model ClassSeries {
   onlineLink  String?
 
   // 0 = Sunday … 6 = Saturday, in the owning studio/host's timezone.
-  dayOfWeek   Int
+  dayOfWeek Int
   // Local wall-clock start, "HH:mm" in the owning timezone. Stored as text so
   // it survives daylight-saving shifts (7pm stays 7pm year round).
-  localTime   String
-  timezone    String @default("Australia/Sydney")
+  localTime String
+  timezone  String @default("Australia/Sydney")
   // "WEEKLY" | "FORTNIGHTLY"
-  frequency   String @default("WEEKLY")
+  frequency String @default("WEEKLY")
 
-  durationMin Int     @default(60)
-  capacity    Int     @default(20)
-  points      Int     @default(20)
-  priceCents  Int     @default(0)
-  currency    String  @default("aud")
+  durationMin Int    @default(60)
+  capacity    Int    @default(20)
+  points      Int    @default(20)
+  priceCents  Int    @default(0)
+  currency    String @default("aud")
+
+  // How the class is listed. LISTING: "DROP_IN" | "TRIAL" | "COURSE" | "HIDDEN"
+  listing          String  @default("DROP_IN")
+  stepupSpots      Int?
+  courseWeeks      Int?
+  coursePriceCents Int?
+  partnerRule      String?
+  leadCap          Int?
+  followCap        Int?
+  balanceX         Int?
+  cancelPolicy     String?
+  kids             Boolean @default(false)
+  venueId          String?
+  venue            Venue?  @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  enrolments Enrolment[]
 
   // First Timer class details, copied onto every generated session.
   music           String?
@@ -325,6 +676,40 @@ model DanceClass {
   priceCents Int    @default(0)
   currency   String @default("aud")
 
+  // How StepUp lists it.
+  // LISTING: "DROP_IN" (a single class) | "TRIAL" (a free first visit, one per
+  //   student per studio, no commission) | "COURSE" (booked a whole term at a
+  //   time, through its series) | "HIDDEN" (on the studio's timetable only)
+  listing     String @default("DROP_IN")
+  // How many of the room's places StepUp may sell. The rest stay with the
+  // studio's pass holders. Null means all of them.
+  stepupSpots Int?
+
+  // Partner work. PARTNER RULE: "CAPS" (separate caps for leads and follows)
+  // | "BALANCE" (no more than balanceX extra on either side) | "NONE" (partner
+  // work, no role limits). Null: not a partner class.
+  partnerRule String?
+  leadCap     Int?
+  followCap   Int?
+  balanceX    Int?
+
+  // Overrides the studio's late cancellation preset for this class.
+  cancelPolicy String?
+  // A kids' class: booked by a guardian, taught by someone with a verified
+  // Working With Children Check.
+  kids         Boolean @default(false)
+
+  venueId           String?
+  venue             Venue?    @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  // When the venue last changed. Anyone booked before then may cancel free.
+  venueChangedAt    DateTime?
+  // When the teacher was sent the class list, 48 hours before.
+  teacherListSentAt DateTime?
+
+  messages     ClassMessage[]
+  walkIns      WalkIn[]
+  textCommands TextCommand[]
+
   // First Timer class details. All optional: classes listed before these
   // fields existed simply don't have them, and the pages say less.
   //
@@ -351,8 +736,8 @@ model DanceClass {
 
   // Short rotating code the host reveals during class; students enter it to
   // claim attendance. Null until the host starts check-in.
-  checkInCode        String?
-  checkInCodeSetAt   DateTime?
+  checkInCode      String?
+  checkInCodeSetAt DateTime?
 
   cancelledAt     DateTime?
   cancelledReason String?
@@ -383,12 +768,23 @@ model DanceClass {
 
 // ─── Bookings & payments ─────────────────────────────────────────────────────
 
-// STATUS: "PENDING_PAYMENT" | "BOOKED" | "ATTENDED" | "CANCELLED" | "WAITLISTED"
+// STATUS: "PENDING_PAYMENT" | "BOOKED" | "ATTENDED" | "NO_SHOW" | "CANCELLED" | "WAITLISTED"
 model Booking {
-  id         String    @id @default(cuid())
-  status     String    @default("BOOKED")
-  bookedAt   DateTime  @default(now())
-  attendedAt DateTime?
+  id             String    @id @default(cuid())
+  status         String    @default("BOOKED")
+  // Partner classes: ROLE "LEAD" | "FOLLOW" | "EITHER". Waitlists are per role.
+  role           String?
+  // Anything the student wants their teacher to know.
+  note           String?
+  noShowAt       DateTime?
+  // Set when this no-show triggered a warning or the prepay rule, so
+  // toggling it on the class list never sends the same notice twice.
+  noShowNoticeAt DateTime?
+
+  enrolmentId String?
+  enrolment   Enrolment? @relation(fields: [enrolmentId], references: [id], onDelete: SetNull)
+  bookedAt    DateTime   @default(now())
+  attendedAt  DateTime?
   cancelledAt DateTime?
 
   // Position in the waitlist queue; null for confirmed bookings.
@@ -412,26 +808,32 @@ model Booking {
   payment Payment?
 
   @@unique([userId, classId])
+  @@index([enrolmentId])
   @@index([classId, status])
   @@index([userId, status])
   @@index([status, attendedAt])
 }
 
 // STATUS: "PENDING" | "PAID" | "FAILED" | "REFUNDED"
+// SALE TYPE: "AGENT" (the studio's own listing: StepUp is its booking agent,
+// class GST stays with the studio) | "SELLER" (StepUp's own packs or credits:
+// StepUp sells, charges GST on the full price, pays the studio an agreed
+// amount). Every payment so far is AGENT; StepUp sells nothing itself yet.
 model Payment {
-  id       String @id @default(cuid())
-  status   String @default("PENDING")
+  id          String @id @default(cuid())
+  status      String @default("PENDING")
+  saleType    String @default("AGENT")
   amountCents Int
   // Platform's cut, in the same currency.
   feeCents    Int    @default(0)
   currency    String @default("aud")
 
-  stripeCheckoutSessionId String?  @unique
-  stripePaymentIntentId   String?  @unique
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String? @unique
   stripeRefundId          String?
 
-  paidAt     DateTime?
-  refundedAt DateTime?
+  paidAt        DateTime?
+  refundedAt    DateTime?
   failureReason String?
 
   createdAt DateTime @default(now())

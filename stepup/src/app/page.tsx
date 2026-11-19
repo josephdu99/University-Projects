@@ -28,7 +28,9 @@ export default async function Home() {
     where: {
       startTime: { gte: new Date() },
       cancelledAt: null,
-      level: { in: ["BEGINNER", "ALL_LEVELS"] },
+      level: { in: ["ABSOLUTE_BEGINNER", "BEGINNER", "ALL_LEVELS"] },
+      listing: { not: "HIDDEN" },
+      kids: false,
     },
   });
 

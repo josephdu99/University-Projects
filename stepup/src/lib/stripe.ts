@@ -2,6 +2,9 @@ import Stripe from "stripe";
 import { db } from "@/lib/db";
 import { appUrl } from "@/lib/email";
 import { logError, logInfo } from "@/lib/logger";
+import { settleEnrolment } from "@/lib/enrolment";
+import { promoteNow } from "@/lib/booking";
+import { notifyPromoted } from "@/lib/cancellation";
 
 /**
  * Percentage of each class fee StepUp keeps. The rest is transferred to the
@@ -107,6 +110,27 @@ export async function syncPayoutAccount(stripeAccountId: string) {
   return status;
 }
 
+const STRIPE_WEEKDAY: Record<string, Stripe.AccountUpdateParams.Settings.Payouts.Schedule.WeeklyAnchor> = {
+  MON: "monday",
+  TUE: "tuesday",
+  WED: "wednesday",
+  THU: "thursday",
+  FRI: "friday",
+};
+
+/**
+ * Pay a studio out once a week on its chosen weekday. Stripe holds the
+ * schedule; we keep a copy so the dashboard can say when the next one lands.
+ */
+export async function setStripePayoutDay(stripeAccountId: string, day: string) {
+  if (!stripeConfigured()) return;
+  const anchor = STRIPE_WEEKDAY[day];
+  if (!anchor) return;
+  await stripeClient().accounts.update(stripeAccountId, {
+    settings: { payouts: { schedule: { interval: "weekly", weekly_anchor: anchor } } },
+  });
+}
+
 export async function createLoginLink(stripeAccountId: string): Promise<string> {
   const stripe = stripeClient();
   const link = await stripe.accounts.createLoginLink(stripeAccountId);
@@ -130,6 +154,11 @@ export async function createCheckoutSession(params: {
   currency: string;
   destinationAccountId: string;
   customerEmail?: string;
+  /** A course: paying confirms every session of this enrolment. */
+  enrolmentId?: string;
+  /** Where to land after paying, and after backing out. */
+  successPath?: string;
+  cancelPath?: string;
 }): Promise<string> {
   const stripe = stripeClient();
   const fee = platformFeeCents(params.amountCents);
@@ -161,12 +190,20 @@ export async function createCheckoutSession(params: {
     payment_intent_data: {
       application_fee_amount: fee,
       transfer_data: { destination: params.destinationAccountId },
-metadata: { bookingId: params.bookingId, paymentId: payment.id },
+      metadata: {
+        bookingId: params.bookingId,
+        paymentId: payment.id,
+        ...(params.enrolmentId ? { enrolmentId: params.enrolmentId } : {}),
+      },
     },
     customer_email: params.customerEmail,
-    metadata: { bookingId: params.bookingId, paymentId: payment.id },
-    success_url: appUrl(`/schedule?paid=1`),
-    cancel_url: appUrl(`/classes/${params.classId}?cancelled=1`),
+    metadata: {
+      bookingId: params.bookingId,
+      paymentId: payment.id,
+      ...(params.enrolmentId ? { enrolmentId: params.enrolmentId } : {}),
+    },
+    success_url: appUrl(params.successPath ?? `/schedule?paid=1`),
+    cancel_url: appUrl(params.cancelPath ?? `/classes/${params.classId}?cancelled=1`),
     expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
   });
 
@@ -257,6 +294,9 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             data: { status: "BOOKED" },
           });
         });
+        // A course: the one payment confirms every session.
+        const enrolmentId = session.metadata?.enrolmentId;
+        if (enrolmentId) await settleEnrolment(enrolmentId, true);
 
         logInfo("stripe.paymentSucceeded", { bookingId });
         break;
@@ -278,6 +318,14 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             data: { status: "CANCELLED", cancelledAt: new Date() },
           });
         });
+        const expiredEnrolment = session.metadata?.enrolmentId;
+        if (expiredEnrolment) {
+          await settleEnrolment(expiredEnrolment, false);
+        } else {
+          // The released place goes to whoever is next on the waitlist.
+          const released = await db.booking.findUnique({ where: { id: bookingId }, select: { classId: true } });
+          if (released) await notifyPromoted(await promoteNow(released.classId));
+        }
         break;
       }
 

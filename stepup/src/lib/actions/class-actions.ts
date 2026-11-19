@@ -5,22 +5,22 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { recordAttendance, type AwardedBadge } from "@/lib/gamification";
-import { reserveSeat, releaseSeat } from "@/lib/booking";
+import { reserveSeat } from "@/lib/booking";
+import { checkExtras, extrasFromForm, applyExtras } from "@/lib/booking-extras";
+import { cancelStudentBooking, notifyPromoted, spendCredit, usableCredit } from "@/lib/cancellation";
+import { cancelEnrolment, enrolInCourse } from "@/lib/enrolment";
 import { requireRole, requireUser } from "@/lib/session";
 import { CLASS_FORMATS, DANCE_LEVELS } from "@/lib/roles";
 import {
   zonedDateTimeToUtc,
+  formatClassWhenLong,
   isValidTimeZone,
   addDaysToDateString,
   dayOfWeekInTimeZone,
   DEFAULT_TIMEZONE,
 } from "@/lib/time";
 import { createCheckoutSession, refundPayment } from "@/lib/stripe";
-import {
-  sendBookingConfirmation,
-  sendClassCancelled,
-  sendWaitlistPromoted,
-} from "@/lib/email";
+import { appUrl, sendBookingConfirmation, sendClassCancelled } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { canManageClass } from "@/lib/studio-access";
 import { logError } from "@/lib/logger";
@@ -31,9 +31,15 @@ export type ActionState = { error?: string; success?: string } | undefined;
 
 export type BookState =
   | { error: string }
-  | { success: true; status: "BOOKED" | "WAITLISTED"; position?: number }
+  | { success: true; status: "BOOKED" | "WAITLISTED"; position?: number; paidWithCredit?: boolean }
   | undefined;
 
+/**
+ * A signed-in dancer booking a class (or enrolling in a course). The same
+ * extras every booking needs are checked here: a role for a partner class,
+ * the studio's current terms, a mobile. A credit at the studio that covers
+ * the price pays for it instead of a card.
+ */
 export async function bookClassAction(
   _prev: BookState,
   formData: FormData
@@ -52,14 +58,56 @@ export async function bookClassAction(
       priceCents: true,
       currency: true,
       hostId: true,
+      studioId: true,
+      seriesId: true,
+      listing: true,
+      partnerRule: true,
+      series: { select: { coursePriceCents: true } },
       host: { select: { payoutAccount: { select: { stripeAccountId: true, chargesEnabled: true } } } },
     },
   });
   if (!danceClass) return { error: "Class not found." };
 
-  const isPaid = danceClass.priceCents > 0;
+  const extras = await checkExtras(user.id, danceClass, extrasFromForm(formData));
+  if (!extras.ok) return { error: extras.error };
 
-  if (isPaid && !danceClass.host.payoutAccount?.chargesEnabled) {
+  // ── A course: the whole term in one purchase.
+  if (danceClass.listing === "COURSE" && danceClass.seriesId) {
+    const price = danceClass.series?.coursePriceCents ?? 0;
+    if (price > 0 && !danceClass.host.payoutAccount?.chargesEnabled) {
+      return { error: "This studio isn't set up to take payments yet. Try again later." };
+    }
+    const enrol = await enrolInCourse({
+      userId: user.id,
+      seriesId: danceClass.seriesId,
+      role: extras.value.role,
+      note: extras.value.note,
+    });
+    if (!enrol.ok) return { error: enrol.reason };
+    await applyExtras(user.id, extras.value);
+    revalidatePath(`/first-class/${classId}`);
+    if (enrol.status === "PENDING_PAYMENT") {
+      const url = await createCheckoutSession({
+        bookingId: enrol.anchorBookingId,
+        classId,
+        classTitle: `${danceClass.title} (whole course)`,
+        amountCents: price,
+        currency: danceClass.currency,
+        destinationAccountId: danceClass.host.payoutAccount!.stripeAccountId,
+        customerEmail: user.email ?? undefined,
+        enrolmentId: enrol.enrolmentId,
+        successPath: `/first-class/${classId}/booked`,
+        cancelPath: `/first-class/${classId}/book`,
+      });
+      redirect(url);
+    }
+    return { success: true, status: "BOOKED" };
+  }
+
+  const isPaid = danceClass.priceCents > 0;
+  const credit = isPaid ? await usableCredit(user.id, danceClass.hostId, danceClass.priceCents) : null;
+
+  if (isPaid && !credit && !danceClass.host.payoutAccount?.chargesEnabled) {
     return {
       error: "This host isn't set up to take payments yet. Try again later.",
     };
@@ -68,14 +116,22 @@ export async function bookClassAction(
   const outcome = await reserveSeat({
     userId: user.id,
     classId,
-    requiresPayment: isPaid,
+    requiresPayment: isPaid && !credit,
+    role: extras.value.role,
+    note: extras.value.note,
   });
 
   if (!outcome.ok) return { error: outcome.reason };
+  await applyExtras(user.id, extras.value);
+  await notifyPromoted(outcome.promoted);
+
+  let paidWithCredit = false;
+  if (credit && outcome.status === "BOOKED") paidWithCredit = await spendCredit(credit.id, outcome.bookingId);
 
   revalidatePath("/discover");
   revalidatePath("/schedule");
   revalidatePath(`/classes/${classId}`);
+  revalidatePath(`/first-class/${classId}`);
 
   if (outcome.status === "WAITLISTED") {
     return { success: true, status: "WAITLISTED", position: outcome.position };
@@ -103,47 +159,72 @@ export async function bookClassAction(
     timezone: danceClass.timezone,
   }).catch((err) => logError("email.bookingConfirmation", err));
 
-  return { success: true, status: "BOOKED" };
+  return { success: true, status: "BOOKED", paidWithCredit };
 }
 
-export async function cancelBookingAction(bookingId: string): Promise<void> {
+/**
+ * Pay for a place held for you: one offered off the waitlist of a paid class,
+ * or a checkout you backed out of.
+ */
+export async function payPendingAction(bookingId: string): Promise<void> {
   const user = await requireUser();
-
   const booking = await db.booking.findUnique({
     where: { id: bookingId },
-    include: { class: true, payment: true },
+    include: {
+      class: {
+        select: {
+          id: true,
+          title: true,
+          priceCents: true,
+          currency: true,
+          host: { select: { payoutAccount: { select: { stripeAccountId: true, chargesEnabled: true } } } },
+        },
+      },
+    },
   });
-  if (!booking || booking.userId !== user.id) return;
-  if (!["BOOKED", "WAITLISTED", "PENDING_PAYMENT"].includes(booking.status)) return;
+  if (!booking || booking.userId !== user.id || booking.status !== "PENDING_PAYMENT" || booking.enrolmentId) return;
+  const account = booking.class.host.payoutAccount;
+  if (!account?.chargesEnabled || booking.class.priceCents <= 0) return;
+  const url = await createCheckoutSession({
+    bookingId: booking.id,
+    classId: booking.class.id,
+    classTitle: booking.class.title,
+    amountCents: booking.class.priceCents,
+    currency: booking.class.currency,
+    destinationAccountId: account.stripeAccountId,
+    customerEmail: user.email ?? undefined,
+    successPath: `/first-class/${booking.class.id}/booked`,
+    cancelPath: `/first-class/${booking.class.id}/book`,
+  });
+  redirect(url);
+}
 
-  const { promoted } = await releaseSeat(bookingId);
+export type CancelBookingState =
+  | { ok: true; message: string }
+  | { ok: false; error: string }
+  | undefined;
 
-  // Refund a paid booking cancelled before the class starts.
-  if (booking.payment?.status === "PAID" && booking.class.startTime > new Date()) {
-    await refundPayment(booking.payment.id).catch((err) =>
-      logError("stripe.refund", err, { bookingId })
-    );
-  }
-
-  if (promoted) {
-    const promotedUser = await db.user.findUnique({
-      where: { id: promoted.userId },
-      select: { email: true, name: true },
-    });
-    if (promotedUser?.email) {
-      await sendWaitlistPromoted({
-        to: promotedUser.email,
-        name: promotedUser.name,
-        classTitle: booking.class.title,
-        startTime: booking.class.startTime,
-        timezone: booking.class.timezone,
-      }).catch((err) => logError("email.waitlistPromoted", err));
-    }
-  }
-
+/** A dancer cancelling their own booking, under the class's preset. */
+export async function cancelBookingAction(bookingId: string): Promise<void> {
+  const user = await requireUser();
+  const result = await cancelStudentBooking(bookingId, user.id);
+  if (!result.ok) return;
+  const booking = await db.booking.findUnique({ where: { id: bookingId }, select: { classId: true } });
   revalidatePath("/discover");
   revalidatePath("/schedule");
-  revalidatePath(`/classes/${booking.classId}`);
+  if (booking) {
+    revalidatePath(`/classes/${booking.classId}`);
+    revalidatePath(`/first-class/${booking.classId}`);
+    redirect(`/classes/${booking.classId}?cancelled=${result.outcome.toLowerCase()}`);
+  }
+}
+
+/** Cancel a whole course enrolment, before the course starts. */
+export async function cancelEnrolmentAction(enrolmentId: string): Promise<void> {
+  const user = await requireUser();
+  const result = await cancelEnrolment(enrolmentId, user.id);
+  revalidatePath("/schedule");
+  if (result.ok) redirect(`/schedule?course=${result.outcome.toLowerCase()}`);
 }
 
 // ─── Attendance ──────────────────────────────────────────────────────────────
@@ -491,6 +572,8 @@ export async function cancelClassAction(
   const danceClass = await db.danceClass.findUnique({
     where: { id: classId },
     include: {
+      studio: { select: { name: true } },
+      host: { select: { name: true, displayName: true } },
       bookings: {
         where: { status: { in: ["BOOKED", "PENDING_PAYMENT", "WAITLISTED"] } },
         include: { user: { select: { email: true, name: true } }, payment: true },
@@ -511,8 +594,38 @@ export async function cancelClassAction(
     data: { status: "CANCELLED", cancelledAt: new Date(), waitlistPosition: null },
   });
 
+  // Same studio first: the recovery offer is this studio's (or this
+  // teacher's) own other classes, and nobody else's.
+  const others = await db.danceClass.findMany({
+    where: {
+      id: { not: classId },
+      startTime: { gte: new Date() },
+      cancelledAt: null,
+      listing: { notIn: ["HIDDEN", "COURSE"] },
+      kids: false,
+      ...(danceClass.studioId ? { studioId: danceClass.studioId } : { hostId: danceClass.hostId, studioId: null }),
+    },
+    orderBy: { startTime: "asc" },
+    take: 3,
+    select: { id: true, title: true, startTime: true, timezone: true },
+  });
+  const alternatives = others.map((o) => ({
+    title: o.title,
+    when: formatClassWhenLong(o.startTime, o.timezone),
+    url: appUrl(`/first-class/${o.id}`),
+  }));
+  const hostName = danceClass.studio?.name ?? (danceClass.host.displayName?.trim() || danceClass.host.name);
+
+  // Anyone who paid with credit gets the credit back.
+  await db.studioCredit.updateMany({
+    where: { usedByBookingId: { in: danceClass.bookings.map((b) => b.id) } },
+    data: { usedAt: null, usedByBookingId: null },
+  });
+
   for (const booking of danceClass.bookings) {
-    if (booking.payment?.status === "PAID") {
+    // A course is paid for once, on its first session; one cancelled session
+    // doesn't refund the whole course. The studio sorts that out.
+    if (booking.payment?.status === "PAID" && !booking.enrolmentId) {
       await refundPayment(booking.payment.id).catch((err) =>
         logError("stripe.refund", err, { bookingId: booking.id })
       );
@@ -525,7 +638,9 @@ export async function cancelClassAction(
         startTime: danceClass.startTime,
         timezone: danceClass.timezone,
         reason,
-        refunded: booking.payment?.status === "PAID",
+        refunded: booking.payment?.status === "PAID" && !booking.enrolmentId,
+        alternatives,
+        hostName,
       }).catch((err) => logError("email.classCancelled", err));
     }
   }

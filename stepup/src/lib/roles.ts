@@ -36,16 +36,25 @@ export function isHost(role: Role) {
   return HOST_ROLES.includes(role);
 }
 
+/**
+ * StepUp's one level scale (Absolute beginner → Advanced), plus All levels
+ * for open classes listed before the scale existed. Studios map their own
+ * level names onto the scale; see src/lib/levels.ts.
+ */
 export const DANCE_LEVELS = [
   "ALL_LEVELS",
+  "ABSOLUTE_BEGINNER",
   "BEGINNER",
+  "IMPROVER",
   "INTERMEDIATE",
   "ADVANCED",
 ] as const;
 
 export const LEVEL_LABEL: Record<(typeof DANCE_LEVELS)[number], string> = {
   ALL_LEVELS: "All Levels",
+  ABSOLUTE_BEGINNER: "Absolute beginner",
   BEGINNER: "Beginner",
+  IMPROVER: "Improver",
   INTERMEDIATE: "Intermediate",
   ADVANCED: "Advanced",
 };

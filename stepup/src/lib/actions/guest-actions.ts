@@ -6,6 +6,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { reserveSeat } from "@/lib/booking";
+import { applyExtras, checkExtras, extrasFromForm } from "@/lib/booking-extras";
+import { notifyPromoted } from "@/lib/cancellation";
+import { enrolInCourse } from "@/lib/enrolment";
 import { createCheckoutSession } from "@/lib/stripe";
 import { issueToken, TOKEN_PURPOSE } from "@/lib/tokens";
 import { checkRateLimit, hashIp } from "@/lib/rate-limit";
@@ -83,6 +86,11 @@ export async function bookAsGuestAction(
       priceCents: true,
       currency: true,
       cancelledAt: true,
+      listing: true,
+      partnerRule: true,
+      studioId: true,
+      seriesId: true,
+      series: { select: { coursePriceCents: true } },
       host: {
         select: {
           payoutAccount: {
@@ -94,7 +102,9 @@ export async function bookAsGuestAction(
   });
   if (!danceClass || danceClass.cancelledAt) return { error: "Class not found." };
 
-  const isPaid = danceClass.priceCents > 0;
+  const isCourse = danceClass.listing === "COURSE" && Boolean(danceClass.seriesId);
+  const price = isCourse ? (danceClass.series?.coursePriceCents ?? 0) : danceClass.priceCents;
+  const isPaid = price > 0;
   if (isPaid && !danceClass.host.payoutAccount?.chargesEnabled) {
     return {
       error: "This host isn't set up to take payments yet. Try again later.",
@@ -133,12 +143,48 @@ export async function bookAsGuestAction(
       select: { id: true, passwordHash: true, role: true, suspendedAt: true },
     }));
 
+  const extras = await checkExtras(guest.id, danceClass, extrasFromForm(formData));
+  if (!extras.ok) return { error: extras.error };
+
+  if (isCourse) {
+    const enrol = await enrolInCourse({
+      userId: guest.id,
+      seriesId: danceClass.seriesId!,
+      role: extras.value.role,
+      note: extras.value.note,
+    });
+    if (!enrol.ok) return { error: enrol.reason };
+    await applyExtras(guest.id, extras.value);
+    const courseToken = await issueToken(guest.id, TOKEN_PURPOSE.GUEST_BOOKING);
+    const bookedPath = `/first-class/${danceClass.id}/booked?t=${encodeURIComponent(courseToken)}`;
+    if (enrol.status === "PENDING_PAYMENT") {
+      const url = await createCheckoutSession({
+        bookingId: enrol.anchorBookingId,
+        classId: danceClass.id,
+        classTitle: `${danceClass.title} (whole course)`,
+        amountCents: price,
+        currency: danceClass.currency,
+        destinationAccountId: danceClass.host.payoutAccount!.stripeAccountId,
+        customerEmail: email,
+        enrolmentId: enrol.enrolmentId,
+        successPath: bookedPath,
+        cancelPath: `/first-class/${danceClass.id}/book`,
+      });
+      redirect(url);
+    }
+    redirect(bookedPath);
+  }
+
   const outcome = await reserveSeat({
     userId: guest.id,
     classId: danceClass.id,
     requiresPayment: isPaid,
+    role: extras.value.role,
+    note: extras.value.note,
   });
   if (!outcome.ok) return { error: outcome.reason };
+  await applyExtras(guest.id, extras.value);
+  await notifyPromoted(outcome.promoted);
 
   const token = await issueToken(guest.id, TOKEN_PURPOSE.GUEST_BOOKING);
 
@@ -151,6 +197,9 @@ export async function bookAsGuestAction(
       currency: danceClass.currency,
       destinationAccountId: danceClass.host.payoutAccount!.stripeAccountId,
       customerEmail: email,
+      // A guest has no schedule to land on; their booking link is the way back.
+      successPath: `/first-class/${danceClass.id}/booked?t=${encodeURIComponent(token)}`,
+      cancelPath: `/first-class/${danceClass.id}/book`,
     });
     redirect(url);
   }

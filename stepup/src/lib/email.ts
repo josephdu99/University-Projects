@@ -16,7 +16,16 @@ export function appUrl(path = "") {
   return `${base.replace(/\/$/, "")}${path}`;
 }
 
-type Email = { to: string; subject: string; html: string; text: string };
+type Email = {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  /** Where replies go: the studio, for messages sent on its behalf. */
+  replyTo?: string;
+  /** One-click unsubscribe for marketing (RFC 8058), alongside the link in the body. */
+  unsubscribeUrl?: string;
+};
 
 /**
  * Sends mail via Resend when RESEND_API_KEY is set; otherwise logs the message.
@@ -49,6 +58,15 @@ async function send(email: Email): Promise<void> {
       subject: email.subject,
       html: email.html,
       text: email.text,
+      ...(email.replyTo ? { reply_to: email.replyTo } : {}),
+      ...(email.unsubscribeUrl
+        ? {
+            headers: {
+              "List-Unsubscribe": `<${email.unsubscribeUrl}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+          }
+        : {}),
     }),
   });
 
@@ -135,6 +153,9 @@ export async function sendBookingConfirmation(params: {
   });
 }
 
+/** For the studio-admin emails in email-studio.ts. */
+export { send as sendEmail, layout as emailLayout };
+
 export async function sendClassCancelled(params: {
   to: string;
   name: string;
@@ -143,21 +164,35 @@ export async function sendClassCancelled(params: {
   timezone: string;
   reason?: string;
   refunded?: boolean;
+  /**
+   * Same studio first: the studio's (or teacher's) own other classes, shown
+   * before anything else. Never other studios'.
+   */
+  alternatives?: { title: string; when: string; url: string }[];
+  hostName?: string;
 }) {
   const when = formatClassWhenLong(params.startTime, params.timezone);
+  const alts = params.alternatives ?? [];
+  const altHtml = alts.length
+    ? `<p>Other classes at ${escapeHtml(params.hostName ?? "the same studio")}:</p><ul>${alts
+        .map((a) => `<li><a href="${a.url}">${escapeHtml(a.title)}</a>, ${escapeHtml(a.when)}</li>`)
+        .join("")}</ul>`
+    : "";
   return send({
     to: params.to,
     subject: `Cancelled: ${params.classTitle}`,
     html: layout(
       "A class you booked was cancelled",
-      `<p><strong>${params.classTitle}</strong> on ${when} has been cancelled by the host.</p>
-       ${params.reason ? `<p>Reason: ${params.reason}</p>` : ""}
-       ${params.refunded ? "<p>Your payment has been refunded in full.</p>" : ""}`,
-      { label: "Find another class", url: appUrl("/discover") }
+      `<p><strong>${escapeHtml(params.classTitle)}</strong> on ${when} has been cancelled by the host.</p>
+       ${params.reason ? `<p>Reason: ${escapeHtml(params.reason)}</p>` : ""}
+       ${params.refunded ? "<p>Your payment has been refunded in full.</p>" : ""}${altHtml}`,
+      alts.length ? undefined : { label: "Find another class", url: appUrl("/discover") }
     ),
     text: `${params.classTitle} on ${when} was cancelled.${
       params.reason ? `\nReason: ${params.reason}` : ""
-    }${params.refunded ? "\nYour payment has been refunded." : ""}`,
+    }${params.refunded ? "\nYour payment has been refunded." : ""}${
+      alts.length ? `\n\nOther classes at ${params.hostName ?? "the same studio"}:\n${alts.map((a) => `- ${a.title}, ${a.when}: ${a.url}`).join("\n")}` : ""
+    }`,
   });
 }
 
@@ -267,7 +302,7 @@ export async function sendClassReminder(params: {
 }
 
 /** For text other people typed that goes into an email's HTML. */
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

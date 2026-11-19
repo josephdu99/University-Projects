@@ -34,13 +34,17 @@ const FORMATS = [ALL, "In person", "Online"];
 /** How many of the three level bars are lit. ALL_LEVELS lights every one. */
 const LEVEL_BARS: Record<string, number> = {
   ALL_LEVELS: 3,
+  ABSOLUTE_BEGINNER: 1,
   BEGINNER: 1,
+  IMPROVER: 2,
   INTERMEDIATE: 2,
   ADVANCED: 3,
 };
 const LEVEL_LABEL: Record<string, string> = {
   ALL_LEVELS: "All levels",
+  ABSOLUTE_BEGINNER: "Absolute beginner",
   BEGINNER: "Beginner",
+  IMPROVER: "Improver",
   INTERMEDIATE: "Intermediate",
   ADVANCED: "Advanced",
 };

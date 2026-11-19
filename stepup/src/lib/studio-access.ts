@@ -73,3 +73,30 @@ export function memberRoleLine(role: string, teaches: boolean): string {
   const label = role === "OWNER" ? "Owner" : role === "MANAGER" ? "Manager" : "Teacher";
   return (role as TeamRole) === "TEACHER" || !teaches ? label : `${label} and teacher`;
 }
+
+/**
+ * What a person on a studio's team may do, from the role table:
+ *   Owner    everything, including payouts
+ *   Manager  timetable, cancellations and messages; no bank details or payouts
+ *   Teacher  only their own classes and class lists
+ * Payouts follow the account that signed the studio up, since that's whose
+ * Stripe account the money goes to.
+ */
+export function studioPerms(access: { isAccountHolder: boolean; member: { role: string } | null }) {
+  const isOwner = access.isAccountHolder || access.member?.role === "OWNER";
+  return { isOwner, payouts: access.isAccountHolder, changeRoles: isOwner };
+}
+
+/**
+ * Can this person run this class's list (mark attendance, add walk-ins,
+ * message the class)? Whoever runs the studio, and the teacher it's assigned to.
+ */
+export async function canRunClass(
+  user: { id: string; role: string },
+  c: { hostId: string; studioId: string | null; teacherMemberId: string | null },
+): Promise<boolean> {
+  if (await canManageClass(user, c)) return true;
+  if (!c.teacherMemberId) return false;
+  const m = await db.studioMember.findUnique({ where: { id: c.teacherMemberId }, select: { userId: true, status: true } });
+  return m?.userId === user.id && m.status === "ACTIVE";
+}

@@ -68,7 +68,7 @@ export type PartnerId = "SOLO" | "ROTATE" | "BRING";
 
 export const PARTNER: { id: PartnerId; label: string; tag: string }[] = [
   { id: "SOLO", label: "Solo, no partner", tag: "No partner needed" },
-  { id: "ROTATE", label: "Partners rotate", tag: "No partner needed" },
+  { id: "ROTATE", label: "Partners rotate", tag: "No partner needed · partners rotate" },
   { id: "BRING", label: "Bring a partner", tag: "Bring a partner" },
 ];
 

@@ -45,6 +45,8 @@ export default async function AfterClassPage({
   const raw = await getNextOptions({
     excludeClassId: danceClass.id,
     style: danceClass.style,
+    studioId: danceClass.studioId,
+    hostId: danceClass.hostId,
     take: 3,
   });
 

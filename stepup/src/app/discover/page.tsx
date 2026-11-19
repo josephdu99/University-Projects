@@ -24,7 +24,9 @@ export default async function DiscoverPage({
   // filter instant rather than a round trip.
   const [classes, myBookings] = await Promise.all([
     db.danceClass.findMany({
-      where: { startTime: { gte: new Date() }, cancelledAt: null },
+      // Classes a studio keeps off StepUp, and kids' classes (booked by a
+      // guardian, which isn't open yet), aren't for browsing.
+      where: { startTime: { gte: new Date() }, cancelledAt: null, listing: { not: "HIDDEN" }, kids: false },
       orderBy: { startTime: "asc" },
       take: 120,
       include: {

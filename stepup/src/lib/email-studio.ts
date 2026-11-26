@@ -196,3 +196,27 @@ export async function sendCourseOpen(p: {
     text: `Enrolments are open for ${p.courseTitle} at ${p.studioName}. It starts ${when}.\n${p.url}\n\nStop updates: ${p.unsubscribeUrl}`,
   });
 }
+
+/** A booked class's day or time changed (approved from the studio's timetable). */
+export async function sendClassRescheduled(p: {
+  to: string;
+  classTitle: string;
+  oldStart: Date;
+  newStart: Date;
+  timezone: string;
+  classUrl: string;
+}) {
+  const before = formatClassWhenLong(p.oldStart, p.timezone);
+  const after = formatClassWhenLong(p.newStart, p.timezone);
+  return sendEmail({
+    to: p.to,
+    subject: `New time: ${p.classTitle}`,
+    html: emailLayout(
+      "Your class has a new time",
+      `<p><strong>${e(p.classTitle)}</strong> was ${before}. It's now <strong>${after}</strong>.</p>
+       <p>Your booking moves with it. If the new time doesn't work, you can cancel free, whatever the usual cancellation policy says.</p>`,
+      { label: "See the class", url: p.classUrl },
+    ),
+    text: `${p.classTitle} was ${before}. It's now ${after}.\nYour booking moves with it. Can't make it? Cancel free: ${p.classUrl}`,
+  });
+}

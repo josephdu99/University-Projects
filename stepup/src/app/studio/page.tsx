@@ -1,4 +1,8 @@
+import { after } from "next/server";
 import { db } from "@/lib/db";
+import { importContext, syncSheets } from "@/lib/schedule-sync";
+import { claudeConfigured } from "@/lib/schedule-claude";
+import { logError } from "@/lib/logger";
 import { requireStudioAccess, studioPerms } from "@/lib/studio-access";
 import { VerifyBanner } from "@/components/VerifyBanner";
 import { StudioHome } from "@/components/studio/StudioHome";
@@ -33,7 +37,7 @@ export const metadata = { title: "Studio, StepUp" };
 export default async function StudioDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ create?: string; from?: string; class?: string }>;
+  searchParams: Promise<{ create?: string; from?: string; class?: string; import?: string }>;
 }) {
   const access = await requireStudioAccess();
   const { user, studio } = access;
@@ -124,6 +128,36 @@ export default async function StudioDashboardPage({
     if (s) sheet = toSheetProps(s, { canManage: true, now });
   }
 
+  // ── Timetable import: the connected sheet, and changes waiting. ──
+  const [{ ctx: importCtx }, sheetSource, changes] = await Promise.all([
+    importContext(studio, now),
+    db.scheduleSource.findFirst({ where: { studioId: studio.id, kind: "SHEET_CSV", activatedAt: { not: null } } }),
+    db.scheduleChange.findMany({
+      where: { status: "PENDING", source: { studioId: studio.id } },
+      orderBy: { createdAt: "asc" },
+      include: { series: { select: { title: true } } },
+      take: 20,
+    }),
+  ]);
+  // Opening the dashboard syncs the sheet, if it hasn't been in 10 minutes.
+  // After the page is sent, so it never slows the dashboard down.
+  if (sheetSource && (!sheetSource.lastSyncedAt || now.getTime() - sheetSource.lastSyncedAt.getTime() > 10 * 60_000)) {
+    after(() => syncSheets({ studioId: studio.id }).then(() => undefined).catch((err) => logError("sync.dashboardOpen", err)));
+  }
+  const ago = (d: Date | null) => {
+    if (!d) return "not yet";
+    const mins = Math.round((now.getTime() - d.getTime()) / 60_000);
+    return mins < 1 ? "just now" : mins < 60 ? `${mins} min ago` : mins < 48 * 60 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
+  };
+  const changeText = (c: (typeof changes)[number]) =>
+    c.field === "removed"
+      ? `${c.series.title} is no longer in your sheet. ${c.bookedCount} ${c.bookedCount === 1 ? "student is" : "students are"} booked.`
+      : c.field === "schedule"
+        ? `${c.series.title}: your sheet now says ${c.toValue} instead of ${c.fromValue}. ${c.bookedCount} ${c.bookedCount === 1 ? "student is" : "students are"} booked.`
+        : c.field === "venue"
+          ? `${c.series.title}: your sheet now says ${c.toValue === "studio" ? studio.name : c.toValue} instead of ${c.fromValue === "studio" ? studio.name : c.fromValue}. ${c.bookedCount} booked.`
+          : `${c.series.title}: the details in your sheet changed. ${c.bookedCount} ${c.bookedCount === 1 ? "student is" : "students are"} booked.`;
+
   // ── Payouts line ──
   const dates = payoutDates(studio.payoutDay);
   const nextCents = payout?.chargesEnabled ? await paidSince(hostId, dates.last) : 0;
@@ -163,7 +197,16 @@ export default async function StudioDashboardPage({
         sheetVenues={venueOpts}
         smsOn={smsConfigured()}
         smsNumber={smsNumberLabel()}
-        initialPanel={params.create === "1" ? "class" : null}
+        initialPanel={params.create === "1" ? "class" : params.import === "1" ? "import" : null}
+        importer={{
+          studioName: studio.name,
+          ctx: importCtx,
+          claudeOn: claudeConfigured(),
+          sheet: sheetSource
+            ? { name: sheetSource.name, checkedLabel: ago(sheetSource.lastSyncedAt), error: sheetSource.lastError, pendingNote: sheetSource.pendingNote }
+            : null,
+          changes: changes.map((c) => ({ id: c.id, text: changeText(c) })),
+        }}
         create={{
           studioName: studio.name,
           styles: studio.styles.length ? studio.styles : DANCE_STYLES,

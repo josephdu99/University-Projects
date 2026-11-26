@@ -20,6 +20,8 @@ export async function createStudioClass(
     teacherMemberId: string;
     timezone: string;
     venue: { id: string | null; location: string; suburb: string | null };
+    /** A room at the venue ("Studio B"), when known. */
+    room?: string | null;
   },
   now = new Date(),
 ) {
@@ -59,6 +61,7 @@ export async function createStudioClass(
     studioId: ctx.studioId,
     teacherMemberId: ctx.teacherMemberId,
   };
+  const room = ctx.room?.trim().slice(0, 40) || null;
 
   let starts: Date[];
   if (listing === "COURSE") {
@@ -91,7 +94,7 @@ export async function createStudioClass(
     seriesId = series.id;
   }
 
-  await tx.danceClass.createMany({ data: starts.map((startTime) => ({ ...shared, seriesId, startTime })) });
+  await tx.danceClass.createMany({ data: starts.map((startTime) => ({ ...shared, room, seriesId, startTime })) });
   const first = await tx.danceClass.findFirstOrThrow({
     where: { hostId: ctx.hostId, title, startTime: starts[0], seriesId },
     orderBy: { createdAt: "desc" },

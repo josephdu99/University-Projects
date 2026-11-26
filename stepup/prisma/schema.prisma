@@ -195,6 +195,7 @@ model Studio {
   optOuts        StudioOptOut[]
   credits        StudioCredit[]
   courseInterest CourseInterest[]
+  scheduleSources ScheduleSource[]
 
   @@index([city])
 }
@@ -274,7 +275,8 @@ model Document {
   bytes       Bytes
   createdAt   DateTime @default(now())
 
-  terms StudioTerms[]
+  terms      StudioTerms[]
+  importRuns ImportRun[]
 }
 
 // A studio's gallery. `draft` photos belong to the concierge draft and go
@@ -645,8 +647,19 @@ model ClassSeries {
 
   sessions DanceClass[]
 
+  // Imported from a timetable (flow v6.6). The source it came from, a key
+  // that finds its row again on the next sync (the sheet row plus a hash of
+  // the title, day and time it was first imported with), and the row as
+  // last applied, which the next sync diffs against.
+  scheduleSourceId String?
+  scheduleSource   ScheduleSource? @relation(fields: [scheduleSourceId], references: [id], onDelete: SetNull)
+  importRowKey     String?
+  importRow        Json?
+  scheduleChanges  ScheduleChange[]
+
   @@index([hostId])
   @@index([archivedAt])
+  @@index([scheduleSourceId])
 }
 
 // A single dated class session.
@@ -910,4 +923,108 @@ model AuditLog {
 
   @@index([targetType, targetId])
   @@index([createdAt])
+}
+
+// ─── Schedule import (flow v6.6) ─────────────────────────────────────────────
+//
+// A studio's timetable comes in from a Google Sheet (published as CSV and
+// kept in sync), pasted cells, or an image or PDF read by Claude. Every
+// source goes through the same review table; nothing is live until the
+// studio creates the classes.
+//
+// KIND: "SHEET_CSV" | "PASTE" | "IMAGE"
+model ScheduleSource {
+  id      String  @id @default(cuid())
+  kind    String
+  name    String
+  url     String?
+  // Our field → the sheet's column index ("2"), saved so later syncs are
+  // plain code.
+  mapping Json?
+  headers String[]
+  autoSync Boolean @default(true)
+  // Set when the studio first creates classes from it. Only active sheets
+  // are synced, so an abandoned review never publishes anything by itself.
+  activatedAt DateTime?
+  // SHA-256 of the last CSV fetched: unchanged means nothing else is written.
+  lastHash     String?
+  lastSyncedAt DateTime?
+  lastError    String?
+  // Rows in the sheet that couldn't be added, as shown to the studio.
+  pendingNote  String?
+  createdAt    DateTime  @default(now())
+
+  studioId String
+  studio   Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  runs    ImportRun[]
+  changes ScheduleChange[]
+  series  ClassSeries[]
+
+  @@index([studioId])
+  @@index([kind, activatedAt])
+}
+
+// One read of a source: written only when something changed, and deleted
+// after 30 days. Image runs record the model and the tokens used.
+// STATUS: "PARSED" | "REVIEWED" | "PUBLISHED" | "FAILED"
+model ImportRun {
+  id           String   @id @default(cuid())
+  status       String   @default("PARSED")
+  raw          Json?
+  model        String?
+  inputTokens  Int?
+  outputTokens Int?
+  error        String?
+  createdAt    DateTime @default(now())
+
+  sourceId   String
+  source     ScheduleSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  documentId String?
+  document   Document?      @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  rows ImportRow[]
+
+  @@index([createdAt])
+  @@index([sourceId])
+}
+
+// DECISION: "INCLUDE" | "SKIP" | "DUPLICATE"
+model ImportRow {
+  id              String   @id @default(cuid())
+  data            Json
+  uncertain       String[]
+  missing         String[]
+  rowKey          String
+  decision        String
+  matchedSeriesId String?
+
+  runId String
+  run   ImportRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+// A sheet change to a class with bookings, waiting for the studio:
+// "Approve and tell students" or "Keep StepUp as is".
+// FIELD: "schedule" (day, time or length) | "venue" | "removed" | "details"
+// STATUS: "PENDING" | "APPROVED" | "IGNORED"
+model ScheduleChange {
+  id          String    @id @default(cuid())
+  field       String
+  fromValue   String
+  toValue     String
+  bookedCount Int
+  // The sheet row as it now stands, applied if approved.
+  row         Json?
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  sourceId String
+  source   ScheduleSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  seriesId String
+  series   ClassSeries    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, status])
 }

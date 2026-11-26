@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { sendDueReminders } from "@/lib/reminders";
 import { runStudioJobs } from "@/lib/studio-jobs";
 import { logWarn } from "@/lib/logger";
@@ -8,19 +8,6 @@ import { logWarn } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  // Refuse rather than run wide open when the secret is not configured: an
-  // unauthenticated endpoint that emails people is worse than a job that
-  // hasn't started yet, and the failure is visible in the logs.
-  if (!secret) return false;
-
-  const header = request.headers.get("authorization") ?? "";
-  const expected = `Bearer ${secret}`;
-  const a = Buffer.from(header);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 /**
  * Pre-class reminders, called by an external scheduler.
@@ -36,7 +23,7 @@ function authorized(request: Request): boolean {
  * that overlap or repeat send nothing twice.
  */
 export async function GET(request: Request) {
-  if (!authorized(request)) {
+  if (!cronAuthorized(request)) {
     logWarn("cron.reminders.unauthorized");
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }

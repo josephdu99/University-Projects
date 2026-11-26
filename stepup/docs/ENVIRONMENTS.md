@@ -228,6 +228,48 @@ arrive; without it they are only logged.
 
 ---
 
+## Timetable import (Google Sheets and images)
+
+Studios bring their timetable in from the dashboard's **Import schedule**
+panel: a Google Sheet published as CSV (kept in sync), pasted cells, or an
+image or PDF that Claude reads. Everything lands in a review table; nothing
+goes live until the studio presses **Create N classes**.
+
+### Setting it up
+
+1. **Sheet sync** runs from `vercel.json`'s cron, `0 17 * * *` (17:00 UTC,
+   about 3 to 4am in Sydney). Vercel Cron sends `Authorization: Bearer
+   $CRON_SECRET`, the same secret the reminders use, so `CRON_SECRET` must be
+   set for Production. Hobby runs land anywhere in that hour, and a more
+   frequent schedule won't deploy on Hobby.
+2. **Image and PDF reading** needs `ANTHROPIC_API_KEY` (Production and
+   Preview). Without it the panel says image reading isn't switched on, and
+   the sheet and paste paths still work. It uses `claude-opus-5-5`, with
+   server-side refusal fallbacks on, and logs each run's token use in
+   `ImportRun`.
+
+### Things worth knowing about it
+
+- All sync logic is `syncSheets({ studioId? })` in `src/lib/schedule-sync.ts`.
+  The cron route, the dashboard-open sync (when the last check is over 10
+  minutes old, run after the page is sent) and **Sync now** (once a minute
+  per studio) all call it. To sync more often, change only the trigger:
+  Vercel Pro and a new `schedule`, or any outside scheduler calling
+  `/api/sync-sheets` (or `?studio=<id>` for one studio) with the secret.
+- An unchanged sheet (same SHA-256 as last time) writes nothing but its check
+  time. Runs and rows are written only when something changed, and runs over
+  30 days old are deleted by the daily cron.
+- Sync is one way, sheet into StepUp. New rows and changes to classes nobody
+  has booked apply straight away; a booked class that changed or disappeared
+  waits in the panel for **Approve and tell students** or **Keep StepUp as
+  is**. Approving tells everyone booked by email (and SMS once Twilio is on)
+  and lets them cancel free.
+- Uploads are capped at 4 MB, because Vercel functions take request bodies up
+  to 4.5 MB. Photos are shrunk in the browser first. The file is kept in the
+  `Document` table with its run.
+- Sheet links must start with `https://docs.google.com/spreadsheets/`, and
+  the server only follows redirects to Google's own hosts.
+
 ## Deployment log
 
 Only entries where an environment was changed by hand, outside the `staging`

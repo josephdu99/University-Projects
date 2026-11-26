@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useState, type CSSProperties, type ReactNode } from "react";
 
-export type Panel = "class" | "invite";
+export type Panel = "class" | "invite" | "import";
 
 type Ctx = {
   open: Panel | null;
@@ -17,6 +17,7 @@ const PanelContext = createContext<Ctx | null>(null);
 export const PANEL_ID: Record<Panel, string> = {
   class: "create-class",
   invite: "invite-teachers",
+  import: "import-schedule",
 };
 
 /**

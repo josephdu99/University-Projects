@@ -9,6 +9,7 @@ import { HostEqualizer } from "@/components/host/HostEqualizer";
 import { OpenPanelButton, StudioBanner, StudioPanelProvider, type Panel } from "./StudioPanels";
 import { CreateClassV2 } from "./CreateClassV2";
 import { ClassSheet, type SheetProps } from "./ClassSheet";
+import { ImportPanel, type ImportProps } from "./ImportPanel";
 import { startPayoutOnboardingAction } from "@/lib/actions/payout-actions";
 
 type CreateProps = React.ComponentProps<typeof CreateClassV2>;
@@ -30,6 +31,7 @@ export type StudioHomeProps = {
   smsOn: boolean;
   smsNumber: string | null;
   create: Omit<CreateProps, "prefill"> & { prefill: CreateProps["prefill"] };
+  importer: ImportProps;
   initialPanel: Panel | null;
 };
 
@@ -202,6 +204,9 @@ export function StudioHome(p: StudioHomeProps) {
           >
             Create a class
           </OpenPanelButton>
+          <OpenPanelButton panel="import" style={{ ...HEADER_OUTLINE, background: "transparent", cursor: "pointer" }}>
+            Import schedule
+          </OpenPanelButton>
           <Link href="/studio/team?invite=1#invite-teachers" className="su-btn" style={HEADER_OUTLINE}>
             Invite teachers
           </Link>
@@ -213,6 +218,7 @@ export function StudioHome(p: StudioHomeProps) {
 
       <StudioBanner />
       <CreateClassV2 {...p.create} />
+      <ImportPanel {...p.importer} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 16, marginBottom: 16 }}>
         <Stat kicker="Upcoming" value={p.upcoming.length} unit={p.upcoming.length === 1 ? "class on the calendar" : "classes on the calendar"}>
@@ -325,7 +331,11 @@ export function StudioHome(p: StudioHomeProps) {
 
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
         <h2 className="sd-h2">Upcoming classes</h2>
-        <span className="sd-hint">Open a class for its class list, to message students, move it or cancel it.</span>
+        <span className="sd-hint">
+          {p.importer.sheet
+            ? `Synced from ${p.importer.sheet.name} · last checked ${p.importer.sheet.checkedLabel}.`
+            : "Open a class for its class list, to message students, move it or cancel it."}
+        </span>
       </div>
       {p.upcoming.length > 0 ? (
         <div className="sd-card" style={{ overflow: "hidden", marginBottom: openUpcoming ? 20 : 36 }}>
@@ -333,9 +343,14 @@ export function StudioHome(p: StudioHomeProps) {
             <Row key={k.id} k={k} past={false} open={p.openId === k.id} />
           ))}
           <div style={{ padding: "16px 22px", borderTop: "1px solid oklch(93% 0.008 70)" }}>
-            <OpenPanelButton panel="class" className="sd-btn-dash" style={{}}>
-              + Create another class
-            </OpenPanelButton>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <OpenPanelButton panel="class" className="sd-btn-dash" style={{}}>
+                + Create another class
+              </OpenPanelButton>
+              <OpenPanelButton panel="import" className="sd-btn-ghost" style={{}}>
+                Import from a sheet or image
+              </OpenPanelButton>
+            </div>
           </div>
         </div>
       ) : (
@@ -348,9 +363,14 @@ export function StudioHome(p: StudioHomeProps) {
           <p className="sd-hint" style={{ margin: 0, fontSize: 15 }}>
             Post a new class and it&apos;s bookable the moment it goes live.
           </p>
-          <OpenPanelButton panel="class" style={{ border: 0, fontWeight: 700, fontSize: 15, padding: "13px 22px", borderRadius: 999, background: C.brand, color: C.onBrand }}>
-            Create a class
-          </OpenPanelButton>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 10 }}>
+            <OpenPanelButton panel="class" style={{ border: 0, fontWeight: 700, fontSize: 15, padding: "13px 22px", borderRadius: 999, background: C.brand, color: C.onBrand }}>
+              Create a class
+            </OpenPanelButton>
+            <OpenPanelButton panel="import" className="sd-btn-ghost" style={{}}>
+              Import your timetable
+            </OpenPanelButton>
+          </div>
         </div>
       )}
       {openUpcoming && sheet}

@@ -6,11 +6,11 @@ import { getSessionUser } from "@/lib/session";
 import { canRunClass, getStudioAccess, studioPerms } from "@/lib/studio-access";
 import { checkClassList } from "@/lib/signed-links";
 import { setAttendance, addWalkIn, type Mark } from "@/lib/attendance";
-import { deliverPassOffer, moveClass, notifyCourseInterest, passAudience, sendToClass, venueFor } from "@/lib/studio-ops";
-import { cancelClass } from "@/lib/class-cancel";
+import { deliverPassOffer, notifyCourseInterest, passAudience, rescheduleClass, sendToClass, venueFor } from "@/lib/studio-ops";
+import { cancelClass, cancelSeriesFrom } from "@/lib/class-cancel";
 import { studioClassProblems, studioDraftFromForm } from "@/lib/studio-class-form";
 import { createStudioClass } from "@/lib/studio-classes";
-import { DANCE_STYLES, formatClock } from "@/lib/class-form";
+import { DANCE_STYLES, DAYS, formatClock } from "@/lib/class-form";
 import { isPolicy } from "@/lib/policies";
 import { isScaleLevel } from "@/lib/levels";
 import { isWwccNumber, normaliseWwcc, wwccCurrent } from "@/lib/wwcc";
@@ -126,17 +126,32 @@ export async function messageClassAction(classId: string, formData: FormData, li
   return done(message, ["/studio", `/class-list/${classId}`]);
 }
 
-/** Cancel from the class sheet: refunds, emails, and "same studio first". */
-export async function cancelClassFromSheetAction(classId: string, reason: string): Promise<Result> {
+/**
+ * Cancel from the class sheet: refunds, emails, and "same studio first". For
+ * a class in a series, "future" cancels it and every later one, and the
+ * series stops.
+ */
+export async function cancelClassFromSheetAction(classId: string, reason: string, scope: "one" | "future" = "one"): Promise<Result> {
   const a = await actor();
   if (!a) return { ok: false, error: "Only the people who run the studio can cancel classes." };
   const c = await db.danceClass.findFirst({
     where: { id: classId, studioId: a.studio.id },
-    select: { title: true, cancelledAt: true, _count: { select: { bookings: { where: { status: { in: ["BOOKED", "PENDING_PAYMENT"] } } } } } },
+    select: { title: true, startTime: true, seriesId: true, cancelledAt: true, _count: { select: { bookings: { where: { status: { in: ["BOOKED", "PENDING_PAYMENT"] } } } } } },
   });
   if (!c) return { ok: false, error: "Class not found." };
   if (c.cancelledAt) return { ok: false, error: "This class is already cancelled." };
-  await cancelClass(classId, reason.trim().slice(0, 120) || undefined);
+  if (c.startTime.getTime() < Date.now()) return { ok: false, error: "This class has already started." };
+  const why = reason.trim().slice(0, 120) || undefined;
+
+  if (scope === "future" && c.seriesId) {
+    const { classes, told } = await cancelSeriesFrom(c.seriesId, c.startTime, why);
+    return done(
+      `${c.title} is cancelled: this class and ${classes - 1} later ${classes - 1 === 1 ? "one" : "ones"}.${
+        told ? ` ${told} ${told === 1 ? "booking was" : "bookings were"} cancelled, refunded where paid, and shown your other classes first.` : ""
+      }`,
+    );
+  }
+  await cancelClass(classId, why);
   const n = c._count.bookings;
   return done(
     n
@@ -145,27 +160,41 @@ export async function cancelClassFromSheetAction(classId: string, reason: string
   );
 }
 
-
-
 /**
- * Move one class, or this and every later class in its series, keeping the
- * bookings. Everyone booked is told, and may cancel free (venueChangedAt).
+ * Reschedule from the class sheet: a new date, start time, length or venue,
+ * for this class or this and every later one in its series. Bookings move
+ * with it, everyone booked is told, and anyone who can't make it can cancel
+ * free.
  */
-export async function moveClassAction(classId: string, formData: FormData): Promise<Result> {
+export async function rescheduleClassAction(classId: string, formData: FormData): Promise<Result> {
   const a = await actor();
-  if (!a) return { ok: false, error: "Only the people who run the studio can move classes." };
+  if (!a) return { ok: false, error: "Only the people who run the studio can reschedule classes." };
   const c = await db.danceClass.findFirst({
     where: { id: classId, studioId: a.studio.id },
-    select: { id: true, title: true, startTime: true, seriesId: true, venueId: true },
+    select: { id: true, seriesId: true, startTime: true, timezone: true, durationMin: true, venueId: true, cancelledAt: true },
   });
   if (!c) return { ok: false, error: "Class not found." };
+  if (c.cancelledAt) return { ok: false, error: "This class is cancelled." };
+  if (c.startTime.getTime() < Date.now()) return { ok: false, error: "This class has already started." };
   const v = await venueFor(a.studio, str(formData, "venue"));
   if (!v) return { ok: false, error: "Pick a venue." };
-  if ((v.id ?? null) === (c.venueId ?? null)) return { ok: false, error: "That's where it already is." };
-  const message = await moveClass(c, v, str(formData, "scope") === "future");
-  return done(message);
+  const limit = await checkRateLimit(`reschedule:${classId}`, 10, 60 * 60_000);
+  if (!limit.allowed) return { ok: false, error: "That's a lot of changes to one class. Try again in an hour." };
+  try {
+    const r = await rescheduleClass(c, {
+      date: str(formData, "date"),
+      time: str(formData, "time"),
+      durationMin: Number(str(formData, "dur")),
+      venue: v,
+      future: str(formData, "scope") === "future",
+    });
+    if (!r.ok) return r;
+    return done(r.message, ["/studio", "/discover", "/start", `/class-list/${classId}`]);
+  } catch (err) {
+    logError("studio.reschedule", err, { classId });
+    return { ok: false, error: "We couldn't save that change. Try again in a moment." };
+  }
 }
-
 
 // ─── Create a class (v6.4 form) ──────────────────────────────────────────────
 
@@ -219,8 +248,14 @@ export async function createStudioClassV2Action(_prev: Result, formData: FormDat
 
   for (const p of ["/start", "/discover", "/studio/classes", "/studio/profile"]) revalidatePath(p);
   const first = formatClassWhen(made.firstStart, a.studio.timezone).replace(/^(Today|Tomorrow)/, (m) => m.toLowerCase());
-  if (d.listing === "HIDDEN") return done(`${made.title} is on your timetable, but not on StepUp.`);
   if (d.listing === "COURSE") return done(`${made.title} is live. Enrolments are open now. The course starts ${first}.`);
+  const days = d.days.map((x) => DAYS.find((y) => y.id === x)?.long ?? x);
+  const onDays = days.length > 1 ? `${days.slice(0, -1).join(", ")} and ${days[days.length - 1]}` : "";
+  if (made.classes > 1) {
+    return done(
+      `${made.title} is live on ${onDays}${d.repeat === "once" ? "" : `, ${d.repeat === "weekly" ? "every week" : "every 2 weeks"} at ${formatClock(d.time)}`}. Students can book it now. First class ${first}.`,
+    );
+  }
   return done(
     `${made.title} is live. Students can book it now. First class ${first}${
       made.sessions > 1 ? `, then ${d.repeat === "weekly" ? "every week" : "every 2 weeks"} at ${formatClock(d.time)}` : ""

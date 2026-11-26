@@ -13,6 +13,7 @@ import {
   BLANK_STUDIO_CLASS,
   DESC_MAX,
   STUDIO_CLASS_PROMISES,
+  sortDays,
   studioClassProblems,
   studioDraftToFormData,
   type StudioClassDraft,
@@ -123,26 +124,27 @@ export function CreateClassV2({
   }
 
   // ── Preview ──
+  const dayNames = DAYS.filter((x) => d.days.includes(x.id));
   const pWhen = isCourse
     ? `${d.termStart ? `From ${shortDate(d.termStart)}` : "Term start"} · ${d.weeks || "?"} weeks · ${formatClock(d.time)}`
-    : `${DAYS.find((x) => x.id === d.day)?.long ?? d.day} ${formatClock(d.time)}`;
+    : `${
+        dayNames.length === 0 ? "Pick a day" : dayNames.length === 1 ? dayNames[0].long : dayNames.map((x) => x.id).join(", ")
+      } ${formatClock(d.time)}`;
   const pPrice =
     d.listing === "TRIAL"
       ? "Free trial"
       : d.listing === "COURSE"
         ? `$${d.coursePrice || 0} for ${d.weeks || "?"} weeks`
-        : d.listing === "HIDDEN"
-          ? "Not on StepUp"
-          : Number(d.price) > 0
-            ? `$${d.price}`
-            : "Free";
-  const pCta = d.listing === "COURSE" ? "Enrol" : d.listing === "TRIAL" ? "Book free trial" : d.listing === "HIDDEN" ? "Timetable only" : "Book";
+        : Number(d.price) > 0
+          ? `$${d.price}`
+          : "Free";
+  const pCta = d.listing === "COURSE" ? "Enrol" : d.listing === "TRIAL" ? "Book free trial" : "Book";
   const publishLabel = pending
     ? "Publishing…"
-    : d.listing === "HIDDEN"
-      ? "Add to timetable"
-      : d.listing === "COURSE"
-        ? "Open enrolments"
+    : d.listing === "COURSE"
+      ? "Open enrolments"
+      : !isCourse && d.days.length > 1
+        ? `Publish ${d.days.length} classes`
         : "Publish class";
 
   return (
@@ -206,9 +208,6 @@ export function CreateClassV2({
               </span>
             )}
             {d.listing === "TRIAL" && <span style={hintStyle}>Free first visit, one per student per studio. No commission is charged.</span>}
-            {d.listing === "HIDDEN" && (
-              <span style={hintStyle}>This class stays off StepUp. Use it for pass-holder-only classes so they still show in your timetable.</span>
-            )}
           </Group>
 
           <Group legend="The class" size={17}>
@@ -328,9 +327,14 @@ export function CreateClassV2({
 
           <Group legend={isCourse ? "Time and place" : "When and where"} size={17}>
             {!isCourse && (
-              <div role="group" aria-label="Day" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div role="group" aria-label="Days, pick one or more" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {DAYS.map((x) => (
-                  <Chip key={x.id} on={d.day === x.id} onClick={() => set({ day: x.id })} accent={ACCENT}>
+                  <Chip
+                    key={x.id}
+                    on={d.days.includes(x.id)}
+                    onClick={() => set({ days: sortDays(d.days.includes(x.id) ? d.days.filter((y) => y !== x.id) : [...d.days, x.id]) })}
+                    accent={ACCENT}
+                  >
                     {x.id}
                   </Chip>
                 ))}
@@ -373,7 +377,9 @@ export function CreateClassV2({
             <span style={hintStyle}>
               {isCourse
                 ? "Weekly from the term start, on that weekday. Saved venues are managed in Profile."
-                : "Saved venues are managed in Profile. Repeating classes are scheduled 12 weeks ahead."}
+                : `Pick as many days as it runs. ${
+                    d.days.length > 1 ? `Each day is its own class on your timetable, at the same time. ` : ""
+                  }Saved venues are managed in Profile. Repeating classes are scheduled 12 weeks ahead.`}
             </span>
           </Group>
 
@@ -440,24 +446,22 @@ export function CreateClassV2({
             </Field>
           </Group>
 
-          {d.listing !== "HIDDEN" && (
-            <Group legend="The First Timer promise" size={17}>
-              {STUDIO_CLASS_PROMISES.map((label, i) => (
-                <label key={label} className="sd-check">
-                  <input
-                    type="checkbox"
-                    checked={d.promise[i]}
-                    onChange={(e) => {
-                      const promise = [...d.promise] as StudioClassDraft["promise"];
-                      promise[i] = e.target.checked;
-                      set({ promise });
-                    }}
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </Group>
-          )}
+          <Group legend="The First Timer promise" size={17}>
+            {STUDIO_CLASS_PROMISES.map((label, i) => (
+              <label key={label} className="sd-check">
+                <input
+                  type="checkbox"
+                  checked={d.promise[i]}
+                  onChange={(e) => {
+                    const promise = [...d.promise] as StudioClassDraft["promise"];
+                    promise[i] = e.target.checked;
+                    set({ promise });
+                  }}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </Group>
 
           {serverError && (
             <div role="alert" style={{ ...errStyle, fontSize: 15 }}>

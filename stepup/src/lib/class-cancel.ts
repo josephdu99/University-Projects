@@ -101,3 +101,30 @@ export async function cancelClass(classId: string, reason?: string): Promise<boo
   revalidatePath("/schedule");
   return true;
 }
+
+/**
+ * Cancel a class and every later one in its series. Classes with anyone
+ * booked or waiting go through `cancelClass` (refunds, emails, same studio
+ * first); empty ones are just taken off. The series stops: nothing new is
+ * scheduled from it. Returns how many students were told.
+ */
+export async function cancelSeriesFrom(seriesId: string, from: Date, reason?: string): Promise<{ classes: number; told: number }> {
+  const sessions = await db.danceClass.findMany({
+    where: { seriesId, startTime: { gte: from }, cancelledAt: null },
+    select: {
+      id: true,
+      _count: { select: { bookings: { where: { status: { in: ["BOOKED", "PENDING_PAYMENT", "WAITLISTED"] } } } } },
+    },
+  });
+  const told = await db.booking.count({
+    where: { classId: { in: sessions.map((s) => s.id) }, status: { in: ["BOOKED", "PENDING_PAYMENT"] } },
+  });
+  for (const s of sessions) {
+    if (s._count.bookings) await cancelClass(s.id, reason);
+    else await db.danceClass.update({ where: { id: s.id }, data: { cancelledAt: new Date(), cancelledReason: reason?.slice(0, 280) || null } });
+  }
+  await db.classSeries.update({ where: { id: seriesId }, data: { archivedAt: new Date() } });
+  revalidatePath("/studio");
+  revalidatePath("/discover");
+  return { classes: sessions.length, told };
+}

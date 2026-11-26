@@ -205,18 +205,30 @@ export async function sendClassRescheduled(p: {
   newStart: Date;
   timezone: string;
   classUrl: string;
+  /** Said when the length changed too. */
+  durationMin?: number;
+  /** Said when it's somewhere new too. */
+  venue?: { name: string; address: string } | null;
 }) {
   const before = formatClassWhenLong(p.oldStart, p.timezone);
   const after = formatClassWhenLong(p.newStart, p.timezone);
+  const same = p.oldStart.getTime() === p.newStart.getTime();
+  const length = p.durationMin ? ` It runs for ${p.durationMin} minutes.` : "";
+  const where = p.venue ? ` It's at ${p.venue.name}, ${p.venue.address}.` : "";
+  const headline = same ? "Your class has changed" : "Your class has a new time";
+  const lead = same
+    ? `<strong>${e(p.classTitle)}</strong>, ${after}, has changed.`
+    : `<strong>${e(p.classTitle)}</strong> was ${before}. It's now <strong>${after}</strong>.`;
+  const leadText = same ? `${p.classTitle}, ${after}, has changed.` : `${p.classTitle} was ${before}. It's now ${after}.`;
   return sendEmail({
     to: p.to,
-    subject: `New time: ${p.classTitle}`,
+    subject: same ? `Changed: ${p.classTitle}` : `New time: ${p.classTitle}`,
     html: emailLayout(
-      "Your class has a new time",
-      `<p><strong>${e(p.classTitle)}</strong> was ${before}. It's now <strong>${after}</strong>.</p>
-       <p>Your booking moves with it. If the new time doesn't work, you can cancel free, whatever the usual cancellation policy says.</p>`,
+      headline,
+      `<p>${lead}${e(length)}${e(where)}</p>
+       <p>Your booking moves with it. If the change doesn't work for you, you can cancel free, whatever the usual cancellation policy says.</p>`,
       { label: "See the class", url: p.classUrl },
     ),
-    text: `${p.classTitle} was ${before}. It's now ${after}.\nYour booking moves with it. Can't make it? Cancel free: ${p.classUrl}`,
+    text: `${leadText}${length}${where}\nYour booking moves with it. Can't make it? Cancel free: ${p.classUrl}`,
   });
 }

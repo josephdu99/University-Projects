@@ -9,9 +9,8 @@ import { sessionStarts } from "@/lib/class-schedule";
 import { createStudioClass } from "@/lib/studio-classes";
 import { BLANK_STUDIO_CLASS, studioClassProblems, type StudioClassDraft } from "@/lib/studio-class-form";
 import { templateFor } from "@/lib/class-templates";
-import { cancelClass } from "@/lib/class-cancel";
+import { cancelSeriesFrom } from "@/lib/class-cancel";
 import { moveClass, sendToClass, venueFor } from "@/lib/studio-ops";
-import { SEAT_HOLDING } from "@/lib/booking";
 import { wwccCurrent } from "@/lib/wwcc";
 import { addDaysToDateString, dateKeyInTimeZone, dayOfWeekInTimeZone, formatClassWhen, toFormFields, zonedDateTimeToUtc } from "@/lib/time";
 import {
@@ -167,7 +166,7 @@ function draftFor(r: ReviewRow, templates: { style: string; scale: string; descr
     desc: tpl.description,
     wear: tpl.wear,
     plan: tpl.plan,
-    day: (r.day || "Mon") as DayId,
+    days: [(r.day || "Mon") as DayId],
     time: r.time,
     dur: r.dur,
     repeat: r.repeat,
@@ -418,22 +417,14 @@ export async function applyRow(
   return `${row.title} updated${moved.length ? ` to ${whenLabel(row)}` : ""}.${opts.notify && n ? ` ${n} ${n === 1 ? "student" : "students"} told, and anyone who can't make it can cancel free.` : ""}`;
 }
 
-/** A class gone from the sheet: cancel its future dates (refunding and telling anyone booked). */
+/**
+ * A class gone from the sheet: cancel its future dates (refunding and telling
+ * anyone booked). It's no longer the sheet's, so adding the row back later
+ * makes a new class.
+ */
 export async function retireSeries(seriesId: string, now = new Date()): Promise<number> {
-  const sessions = await db.danceClass.findMany({
-    where: { seriesId, startTime: { gte: now }, cancelledAt: null },
-    select: { id: true, _count: { select: { bookings: { where: { status: { in: SEAT_HOLDING } } } } } },
-  });
-  let told = 0;
-  for (const s of sessions) {
-    if (s._count.bookings) {
-      await cancelClass(s.id, "Taken off the timetable");
-      told += s._count.bookings;
-    } else {
-      await db.danceClass.update({ where: { id: s.id }, data: { cancelledAt: now, cancelledReason: "Taken off the timetable" } });
-    }
-  }
-  await db.classSeries.update({ where: { id: seriesId }, data: { archivedAt: now } });
+  const { told } = await cancelSeriesFrom(seriesId, now, "Taken off the timetable");
+  await db.classSeries.update({ where: { id: seriesId }, data: { scheduleSourceId: null, importRowKey: null } });
   return told;
 }
 
@@ -523,12 +514,16 @@ async function syncOne(
 
   const { ctx, templates } = await importContext(studio, now);
   const { table, mapping } = tableWithMapping(got.text, src.mapping as ColumnMapping);
-  const imported = await db.classSeries.findMany({ where: { scheduleSourceId: src.id, archivedAt: null }, select: { id: true, importRow: true } });
+  // Classes the studio cancelled on StepUp stay cancelled while their row is
+  // still in the sheet: they're matched, so not made again, but never changed.
+  const linked = await db.classSeries.findMany({ where: { scheduleSourceId: src.id }, select: { id: true, importRow: true, archivedAt: true } });
+  const stopped = new Set(linked.filter((i) => i.archivedAt).map((i) => i.id));
+  const imported = linked.filter((i) => !i.archivedAt);
   // Classes this sheet made aren't duplicates of themselves.
   const ownTitles = new Set(imported.map((i) => `${String((i.importRow as AppliedRow | null)?.title ?? "").toLowerCase()}`));
   const rows = rowsFromTable(table, mapping).map((r) => matchRow(r, { ...ctx, existing: ctx.existing.filter((e) => !ownTitles.has(e.title.toLowerCase())) }));
   const booked = await bookedCounts(imported.map((i) => i.id), now);
-  const prev: Imported[] = imported.filter((i) => i.importRow).map((i) => ({ seriesId: i.id, row: i.importRow as unknown as AppliedRow, booked: booked.get(i.id) ?? 0 }));
+  const prev: Imported[] = linked.filter((i) => i.importRow).map((i) => ({ seriesId: i.id, row: i.importRow as unknown as AppliedRow, booked: booked.get(i.id) ?? 0 }));
   const diff = diffSheet(rows, prev);
 
   const notes: string[] = [];
@@ -540,6 +535,7 @@ async function syncOne(
     else notes.push(`${r.title || "A row"}: ${res.why}`);
   }
   for (const ch of diff.changed) {
+    if (stopped.has(ch.seriesId)) continue;
     const blockers = rowBlockers({ ...ch.row, dup: false }, ctx);
     if (blockers.length) {
       notes.push(`${ch.row.title}: ${blockers.join(" ")}`);
@@ -567,6 +563,11 @@ async function syncOne(
     }
   }
   for (const gone of diff.removed) {
+    if (stopped.has(gone.seriesId)) {
+      // Cancelled on StepUp, and now gone from the sheet too: nothing left to keep.
+      await db.classSeries.update({ where: { id: gone.seriesId }, data: { scheduleSourceId: null, importRowKey: null } });
+      continue;
+    }
     if (gone.booked === 0) {
       await retireSeries(gone.seriesId, now);
       result.removed++;

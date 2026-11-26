@@ -1,24 +1,30 @@
 /**
  * How a studio lists a class on StepUp. StepUp is the way new students find a
- * studio, not a replacement for its own passes, so the studio picks what goes
- * on and how.
+ * studio, not a replacement for its own passes, so the studio picks how it
+ * goes on.
  */
 import { addDaysToDateString } from "@/lib/time";
 
+/**
+ * "HIDDEN" (not listed) can no longer be picked, but classes made before it
+ * was taken out keep it, and stay off StepUp.
+ */
 export type Listing = "DROP_IN" | "TRIAL" | "COURSE" | "HIDDEN";
+export type ListingChoice = Exclude<Listing, "HIDDEN">;
 
-export const LISTINGS: { id: Listing; label: string; how: string }[] = [
+export const LISTINGS: { id: ListingChoice; label: string; how: string }[] = [
   { id: "DROP_IN", label: "Drop-in friendly", how: "Bookable as a single class. For most open-level classes." },
   { id: "TRIAL", label: "Trial / first class", how: "Free first visit, one per student. No commission." },
   { id: "COURSE", label: "Course enrolment", how: "Students book the whole term as one purchase." },
-  { id: "HIDDEN", label: "Not listed", how: "Stays off StepUp. For pass-holder-only classes." },
 ];
 
-export function isListing(v: unknown): v is Listing {
+/** One of the listings a studio can pick for a new class. */
+export function isListing(v: unknown): v is ListingChoice {
   return LISTINGS.some((l) => l.id === v);
 }
 
 export function listingLabel(v: string): string {
+  if (v === "HIDDEN") return "Not listed";
   return LISTINGS.find((l) => l.id === v)?.label ?? "Drop-in friendly";
 }
 

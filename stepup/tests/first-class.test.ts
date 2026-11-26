@@ -10,6 +10,7 @@ import {
   opennessOf,
   answersFromParams,
   answersToParams,
+  MAX_SUBURBS,
   answersFromStored,
   answerChips,
   EMPTY_ANSWERS,
@@ -120,7 +121,7 @@ describe("music", () => {
   });
 
   it("says why in the class's own terms", () => {
-    const [top] = rankClasses([cls({ style: "Contemporary", music: "hiphop" })], A({ music: "hiphop" }));
+    const [top] = rankClasses([cls({ style: "Contemporary", music: "hiphop" })], A({ music: ["hiphop"] }));
     expect(top.score).toBe(2);
     expect(top.reasons[0]).toBe("It's danced to hip hop & R&B, which you picked.");
   });
@@ -147,7 +148,7 @@ describe("reach", () => {
 
   it("hides an in-person class in another city once a suburb is picked", () => {
     expect(outOfReach(melbourne, "Newtown")).toBe(true);
-    expect(rankClasses([melbourne], A({ where: "Newtown" }))).toEqual([]);
+    expect(rankClasses([melbourne], A({ where: ["Newtown"] }))).toEqual([]);
   });
 
   it("hides nothing before a suburb is picked", () => {
@@ -170,14 +171,14 @@ describe("questionsDone", () => {
   it("counts each question once it has a real answer", () => {
     expect(questionsDone(EMPTY_ANSWERS)).toEqual([false, false, false]);
     expect(questionsDone(A({ goals: ["fun"] }))).toEqual([true, false, false]);
-    expect(questionsDone(A({ music: "latin" }))).toEqual([false, true, false]);
+    expect(questionsDone(A({ music: ["latin"] }))).toEqual([false, true, false]);
   });
 
   it("needs a picked suburb and a time slot for the third", () => {
-    expect(questionsDone(A({ where: "Newtown" }))[2]).toBe(false);
+    expect(questionsDone(A({ where: ["Newtown"] }))[2]).toBe(false);
     expect(questionsDone(A({ when: ["weekday"] }))[2]).toBe(false);
-    expect(questionsDone(A({ where: "Newt", when: ["weekday"] }))[2]).toBe(false);
-    expect(questionsDone(A({ where: "Newtown", when: ["weekday"] }))[2]).toBe(true);
+    expect(questionsDone(A({ where: ["Newt"], when: ["weekday"] }))[2]).toBe(false);
+    expect(questionsDone(A({ where: ["Newtown"], when: ["weekday"] }))[2]).toBe(true);
   });
 });
 
@@ -185,15 +186,15 @@ describe("ranking, with the handoff's scoring", () => {
   it("scores +2 music, +1 time slot, +1 same suburb", () => {
     const [top] = rankClasses([cls({ style: "Salsa", suburb: "Newtown", startTime: at(18, 19) })], {
       goals: [],
-      music: "latin",
-      where: "Newtown",
+      music: ["latin"],
+      where: ["Newtown"],
       when: ["weekday"],
     });
     expect(top.score).toBe(4);
   });
 
   it("scores +0.5 for the same area instead of the same suburb", () => {
-    const [top] = rankClasses([cls({ suburb: "Newtown" })], A({ where: "Marrickville" }));
+    const [top] = rankClasses([cls({ suburb: "Newtown" })], A({ where: ["Marrickville"] }));
     expect(top.score).toBe(0.5);
   });
 
@@ -208,7 +209,7 @@ describe("ranking, with the handoff's scoring", () => {
         cls({ id: "near", style: "Ballet", suburb: "Newtown", startTime: at(18, 19) }),
         cls({ id: "music", style: "Salsa", suburb: "Bondi", startTime: at(18, 9) }),
       ],
-      { goals: [], music: "latin", where: "Newtown", when: ["weekday"] },
+      { goals: [], music: ["latin"], where: ["Newtown"], when: ["weekday"] },
     );
     // music: 2. near: 1 (suburb) + 1 (slot) = 2. A tie on score; both are
     // First Timer classes, so the sooner one, 9am, goes first.
@@ -237,8 +238,8 @@ describe("ranking, with the handoff's scoring", () => {
       cls({ id: "salsa", style: "Salsa" }),
       cls({ id: "ballet", style: "Ballet", startTime: at(25, 19) }),
     ];
-    expect(rankClasses(pool, A({ music: "latin" }))[0].id).toBe("salsa");
-    expect(rankClasses(pool, A({ music: "classical" }))[0].id).toBe("ballet");
+    expect(rankClasses(pool, A({ music: ["latin"] }))[0].id).toBe("salsa");
+    expect(rankClasses(pool, A({ music: ["classical"] }))[0].id).toBe("ballet");
   });
 
   it("lets goals add reasons but never move the ranking", () => {
@@ -253,8 +254,8 @@ describe("reasons", () => {
   it("names each fact that scored, and nothing that did not", () => {
     const [top] = rankClasses([cls({ style: "Salsa", suburb: "Newtown" })], {
       goals: [],
-      music: "latin",
-      where: "Newtown",
+      music: ["latin"],
+      where: ["Newtown"],
       when: ["weekday"],
     });
     expect(top.reasons).toContain("Salsa sits in the Latin & pop you picked.");
@@ -264,7 +265,7 @@ describe("reasons", () => {
   });
 
   it("says which suburb an area match is in", () => {
-    const [top] = rankClasses([cls({ suburb: "Newtown" })], A({ where: "Marrickville" }));
+    const [top] = rankClasses([cls({ suburb: "Newtown" })], A({ where: ["Marrickville"] }));
     expect(top.reasons).toContain("In Newtown, the same part of Sydney as Marrickville.");
   });
 
@@ -286,41 +287,67 @@ describe("reasons", () => {
   });
 
   it("leads with what the dancer answered, not with the level", () => {
-    const [top] = rankClasses([cls()], A({ music: "latin" }));
+    const [top] = rankClasses([cls()], A({ music: ["latin"] }));
     expect(top.reasons[0]).toContain("you picked");
   });
 });
 
 describe("answers in and out", () => {
   it("shows a chip only for a suburb that was actually picked", () => {
-    expect(answerChips(A({ where: "Newtown" }))).toEqual(["Newtown"]);
-    expect(answerChips(A({ where: "Newt" }))).toEqual([]);
+    expect(answerChips(A({ where: ["Newtown"] }))).toEqual(["Newtown"]);
+    expect(answerChips(A({ where: ["Newt"] }))).toEqual([]);
   });
 
   it("survive being written to a URL and read back", () => {
-    const a: Answers = { goals: ["fun", "meet"], music: "hiphop", where: "Newtown", when: ["weekday", "weekend"] };
+    const a: Answers = { goals: ["fun", "meet"], music: ["hiphop", "latin"], where: ["Newtown", "Surry Hills"], when: ["weekday", "weekend"] };
     expect(answersFromParams(Object.fromEntries(answersToParams(a).entries()))).toEqual(a);
   });
 
   it("throw away anything from a URL they do not recognise", () => {
     const back = answersFromParams({ goals: "fun,not-a-goal,fun", music: "polka", where: "Atlantis", when: "weekday,whenever" });
-    expect(back).toEqual({ goals: ["fun"], music: null, where: "", when: ["weekday"] });
+    expect(back).toEqual({ goals: ["fun"], music: [], where: [], when: ["weekday"] });
   });
 
   it("read back the stored shape, and nothing else", () => {
     expect(answersFromStored({ goals: ["fun"], music: "latin", where: "newtown", when: ["lunch"] })).toEqual({
       goals: ["fun"],
-      music: "latin",
-      where: "Newtown",
+      music: ["latin"],
+      where: ["Newtown"],
       when: ["lunch"],
     });
     expect(answersFromStored(null)).toEqual(EMPTY_ANSWERS);
     expect(answersFromStored("nonsense")).toEqual(EMPTY_ANSWERS);
     expect(answersFromStored({ goals: "fun", music: 7, where: ["x"], when: [1, "weekend"] })).toEqual({
       goals: [],
-      music: null,
-      where: "",
+      music: [],
+      where: [],
       when: ["weekend"],
     });
+  });
+});
+
+describe("more than one answer", () => {
+  it("matches a class that fits any of the music picked", () => {
+    const pool = [cls({ id: "salsa", style: "Salsa" }), cls({ id: "afro", style: "Afrobeats", startTime: at(25, 19) }), cls({ id: "ballet", style: "Ballet" })];
+    const ranked = rankClasses(pool, A({ music: ["latin", "afro"] }));
+    expect(ranked.filter((r) => r.score === 2).map((r) => r.id).sort()).toEqual(["afro", "salsa"]);
+    expect(ranked.find((r) => r.id === "afro")!.reasons).toContain("Afrobeats sits in the Afrobeats & dancehall you picked.");
+    expect(questionsDone(A({ music: ["latin", "afro"] }))[1]).toBe(true);
+  });
+
+  it("scores a class by the nearest of several suburbs", () => {
+    const [bondi] = rankClasses([cls({ suburb: "Bondi" })], A({ where: ["Newtown", "Bondi"] }));
+    expect(bondi.score).toBe(1);
+    expect(bondi.reasons).toContain("In Bondi, where you said.");
+    const [coogee] = rankClasses([cls({ suburb: "Coogee" })], A({ where: ["Newtown", "Bondi"] }));
+    expect(coogee.score).toBe(0.5);
+    expect(coogee.reasons).toContain("In Coogee, the same part of Sydney as Bondi.");
+    expect(answerChips(A({ where: ["Newtown", "Bondi", "Nowhere"] }))).toEqual(["Newtown", "Bondi"]);
+  });
+
+  it("keeps suburbs once each, and no more than five, from a link", () => {
+    const back = answersFromParams({ where: "Newtown,newtown,Bondi,Glebe,Coogee,Manly,Ryde" });
+    expect(back.where).toEqual(["Newtown", "Bondi", "Glebe", "Coogee", "Manly"]);
+    expect(back.where).toHaveLength(MAX_SUBURBS);
   });
 });

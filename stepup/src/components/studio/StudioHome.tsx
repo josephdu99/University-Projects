@@ -9,6 +9,7 @@ import { HostEqualizer } from "@/components/host/HostEqualizer";
 import { OpenPanelButton, StudioBanner, StudioPanelProvider, type Panel } from "./StudioPanels";
 import { CreateClassV2 } from "./CreateClassV2";
 import { ClassSheet, type SheetProps } from "./ClassSheet";
+import type { SheetTab } from "@/lib/sheet-tabs";
 import { ImportPanel, type ImportProps } from "./ImportPanel";
 import { startPayoutOnboardingAction } from "@/lib/actions/payout-actions";
 
@@ -26,6 +27,8 @@ export type StudioHomeProps = {
   payouts: { on: boolean; canSetUp: boolean; holderName: string; nextLabel: string; nextCents: number };
   students: { total: number; once: number; returned: number; faces: string[] };
   openId: string | null;
+  /** The class sheet's tab to open on: "reschedule" from Edit. */
+  openTab: SheetTab;
   sheet: SheetProps | null;
   sheetVenues: { id: string; name: string; address: string }[];
   smsOn: boolean;
@@ -53,7 +56,7 @@ const LISTING_CHIP: Record<string, { background: string; color: string }> = {
   HIDDEN: chip("oklch(93% 0.01 70)", "oklch(40% 0.02 60)"),
 };
 
-function Row({ k, past, open }: { k: DashClass; past: boolean; open: boolean }) {
+function Row({ k, past, open, editing }: { k: DashClass; past: boolean; open: boolean; editing?: boolean }) {
   const d = dateBlockParts(k.startTime, k.timezone);
   const when = `${formatInTimeZoneShort(k.startTime, k.timezone)}${k.repeat && !past ? ` · ${k.repeat.toLowerCase()}` : ""}`;
   const pct = k.stepupSpots ? Math.min(100, Math.round((k.booked / k.stepupSpots) * 100)) : 0;
@@ -107,14 +110,26 @@ function Row({ k, past, open }: { k: DashClass; past: boolean; open: boolean }) 
       </div>
       <div style={{ display: "flex", gap: 8, flex: "none" }}>
         <Link
-          href={open ? "/studio" : `/studio?class=${k.id}#class-sheet`}
+          href={open && !editing ? "/studio" : `/studio?class=${k.id}#class-sheet`}
           scroll={false}
-          aria-expanded={open}
+          aria-expanded={open && !editing}
           aria-controls="class-sheet"
           className="sd-btn-ghost"
         >
-          {past ? "Class list" : open ? "Close" : "Open"}
+          {past ? "Class list" : open && !editing ? "Close" : "Open"}
         </Link>
+        {!past && (
+          <Link
+            href={open && editing ? "/studio" : `/studio?class=${k.id}&tab=reschedule#class-sheet`}
+            scroll={false}
+            aria-expanded={open && editing}
+            aria-controls="class-sheet"
+            aria-label={`${open && editing ? "Close editing" : "Edit"} ${k.title}: reschedule or cancel`}
+            className="sd-btn-ghost"
+          >
+            {open && editing ? "Done" : "Edit"}
+          </Link>
+        )}
         {past && (
           <Link href={`/studio?create=1&from=${k.id}#create-class`} className="sd-btn-ghost">
             Run again
@@ -151,7 +166,18 @@ export function StudioHome(p: StudioHomeProps) {
   const next = p.upcoming[0];
   const openUpcoming = p.sheet && !p.sheet.past;
   const openPast = p.sheet && p.sheet.past;
-  const sheet = p.sheet ? <ClassSheet s={p.sheet} venues={p.sheetVenues} smsOn={p.smsOn} smsNumber={p.smsNumber} /> : null;
+  const editing = p.openTab === "reschedule" || p.openTab === "cancel";
+  const sheet = p.sheet ? (
+    <ClassSheet
+      // A fresh sheet for each class and way in, so Edit opens on Reschedule.
+      key={`${p.sheet.id}:${p.openTab}`}
+      s={p.sheet}
+      venues={p.sheetVenues}
+      smsOn={p.smsOn}
+      smsNumber={p.smsNumber}
+      initialTab={p.openTab}
+    />
+  ) : null;
 
   return (
     <StudioPanelProvider initial={p.initialPanel}>
@@ -204,7 +230,10 @@ export function StudioHome(p: StudioHomeProps) {
           >
             Create a class
           </OpenPanelButton>
-          <OpenPanelButton panel="import" style={{ ...HEADER_OUTLINE, background: "transparent", cursor: "pointer" }}>
+          <OpenPanelButton
+            panel="import"
+            style={{ flex: "none", whiteSpace: "nowrap", border: 0, fontWeight: 700, fontSize: 15, padding: "14px 24px", borderRadius: 999, background: C.brand, color: C.onBrand }}
+          >
             Import schedule
           </OpenPanelButton>
           <Link href="/studio/team?invite=1#invite-teachers" className="su-btn" style={HEADER_OUTLINE}>
@@ -334,13 +363,13 @@ export function StudioHome(p: StudioHomeProps) {
         <span className="sd-hint">
           {p.importer.sheet
             ? `Synced from ${p.importer.sheet.name} · last checked ${p.importer.sheet.checkedLabel}.`
-            : "Open a class for its class list, to message students, move it or cancel it."}
+            : "Open a class for its class list and messages. Edit to reschedule or cancel it; everyone booked is told."}
         </span>
       </div>
       {p.upcoming.length > 0 ? (
         <div className="sd-card" style={{ overflow: "hidden", marginBottom: openUpcoming ? 20 : 36 }}>
           {p.upcoming.map((k) => (
-            <Row key={k.id} k={k} past={false} open={p.openId === k.id} />
+            <Row key={k.id} k={k} past={false} open={p.openId === k.id} editing={editing} />
           ))}
           <div style={{ padding: "16px 22px", borderTop: "1px solid oklch(93% 0.008 70)" }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>

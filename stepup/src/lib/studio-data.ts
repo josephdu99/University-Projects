@@ -218,6 +218,10 @@ export async function classSheet(classId: string, hostId: string) {
     })),
     recovery: others,
     dow: dayOfWeekInTimeZone(c.startTime, c.timezone),
+    durationMin: c.durationMin,
+    laterInSeries: c.seriesId
+      ? await db.danceClass.count({ where: { seriesId: c.seriesId, startTime: { gt: c.startTime }, cancelledAt: null } })
+      : 0,
   };
 }
 

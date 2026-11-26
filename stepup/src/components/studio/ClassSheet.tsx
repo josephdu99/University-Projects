@@ -7,12 +7,14 @@ import {
   cancelClassFromSheetAction,
   markAttendanceAction,
   messageClassAction,
-  moveClassAction,
   removeWalkInAction,
+  rescheduleClassAction,
   type ListLink,
   type Result,
 } from "@/lib/actions/studio-admin-actions";
 import { ROLE_LABEL, type DanceRole } from "@/lib/partner-roles";
+import { LENGTHS } from "@/lib/class-form";
+import type { SheetTab } from "@/lib/sheet-tabs";
 import { CloseButton } from "./CreateClassV2";
 import { PrintButton } from "./PrintButton";
 import { useStudioPanels } from "./StudioPanels";
@@ -48,7 +50,11 @@ export type SheetProps = {
   /** Attendance opens an hour before class. */
   canMark: boolean;
   hasSeries: boolean;
+  /** Classes after this one in its series, not cancelled. */
+  laterInSeries: number;
   canManage: boolean;
+  /** This class's date, start time, length and venue, for rescheduling. */
+  edit: { date: string; time: string; durationMin: number; venue: string; today: string };
 };
 
 const MSG_TEMPLATES: [string, string][] = [
@@ -59,7 +65,7 @@ const MSG_TEMPLATES: [string, string][] = [
 
 const CANCEL_REASONS = ["Teacher unwell", "Venue unavailable", "Not enough bookings", "Public holiday"];
 
-type Tab = "list" | "msg" | "move" | "cancel";
+type Tab = SheetTab;
 
 function people(n: number) {
   return `${n} ${n === 1 ? "student" : "students"}`;
@@ -78,6 +84,7 @@ export function ClassSheet({
   smsNumber,
   link = null,
   closeHref = "/studio",
+  initialTab = "list",
 }: {
   s: SheetProps;
   venues: { id: string; name: string; address: string }[];
@@ -87,18 +94,27 @@ export function ClassSheet({
   link?: ListLink;
   /** Where × goes; none on a page of its own. */
   closeHref?: string | null;
+  /** "Edit" on the dashboard opens it on Reschedule. */
+  initialTab?: SheetTab;
 }) {
   const router = useRouter();
   const { setToast } = useStudioPanels();
-  const [tab, setTab] = useState<Tab>("list");
+  const manageTabs: Tab[] = ["reschedule", "cancel"];
+  const [tab, setTab] = useState<Tab>(() =>
+    s.past ? (initialTab === "msg" ? "msg" : "list") : manageTabs.includes(initialTab) && !s.canManage ? "list" : initialTab,
+  );
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [walkName, setWalkName] = useState("");
   const [walkRole, setWalkRole] = useState<DanceRole>("EITHER");
   const [msg, setMsg] = useState("");
-  const [moveVenue, setMoveVenue] = useState<string>("");
+  const [newDate, setNewDate] = useState(s.edit.date);
+  const [newTime, setNewTime] = useState(s.edit.time);
+  const [newDur, setNewDur] = useState(String(s.edit.durationMin));
+  const [newVenue, setNewVenue] = useState(venues.some((v) => v.id === s.edit.venue) ? s.edit.venue : (venues[0]?.id ?? "studio"));
   const [moveScope, setMoveScope] = useState<"one" | "future">("one");
   const [reason, setReason] = useState(CANCEL_REASONS[0]);
+  const [cancelScope, setCancelScope] = useState<"one" | "future">("one");
 
   const tabs: { id: Tab; label: string }[] = s.past
     ? [
@@ -110,7 +126,7 @@ export function ClassSheet({
         { id: "msg", label: "Message" },
         ...(s.canManage
           ? ([
-              { id: "move", label: "Move" },
+              { id: "reschedule", label: "Reschedule" },
               { id: "cancel", label: "Cancel" },
             ] as { id: Tab; label: string }[])
           : []),
@@ -415,43 +431,53 @@ export function ClassSheet({
         </div>
       )}
 
-      {tab === "move" && (
+      {tab === "reschedule" && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!moveVenue) {
-              setError("Pick where it's moving to.");
-              return;
-            }
             const fd = new FormData();
-            fd.set("venue", moveVenue);
+            fd.set("date", newDate);
+            fd.set("time", newTime);
+            fd.set("dur", newDur);
+            fd.set("venue", newVenue);
             fd.set("scope", moveScope);
-            run(() => moveClassAction(s.id, fd), (r) => {
+            run(() => rescheduleClassAction(s.id, fd), (r) => {
               if (r?.ok) setToast(r.message);
               router.push("/studio", { scroll: false });
             });
           }}
           style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 720 }}
         >
-          <fieldset style={{ border: 0, margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-            <legend style={{ fontWeight: 800, fontSize: 16, marginBottom: 10, padding: 0 }}>New location</legend>
-            {venues.map((v) => {
-              const current = (v.id === "studio" ? null : v.id) === s.venueId;
-              return (
-                <label key={v.id} className="sd-radio-card" style={current ? { opacity: 0.6 } : undefined}>
-                  <input type="radio" name="move-venue" disabled={current} checked={moveVenue === v.id} onChange={() => setMoveVenue(v.id)} />
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <strong>{v.name}</strong>
-                    <span className="sd-hint">
-                      {v.address}
-                      {current ? " · where it is now" : ""}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-            {venues.length < 2 && <span className="sd-hint">Add another venue in Profile to move classes there.</span>}
-          </fieldset>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", gap: 12 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Date</span>
+              <input className="su-fld" type="date" min={s.edit.today} value={newDate} onChange={(e) => { setNewDate(e.target.value); setError(null); }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Start time</span>
+              <input className="su-fld" type="time" value={newTime} onChange={(e) => { setNewTime(e.target.value); setError(null); }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Length</span>
+              <select className="su-fld" value={newDur} onChange={(e) => { setNewDur(e.target.value); setError(null); }}>
+                {lengthOptions(s.edit.durationMin).map((m) => (
+                  <option key={m} value={String(m)}>
+                    {lengthLabel(m)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>Venue</span>
+              <select className="su-fld" value={newVenue} onChange={(e) => { setNewVenue(e.target.value); setError(null); }}>
+                {venues.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           {s.hasSeries && (
             <fieldset style={{ border: 0, margin: 0, padding: 0 }}>
               <legend style={{ fontWeight: 800, fontSize: 16, marginBottom: 10, padding: 0 }}>Which classes</legend>
@@ -459,29 +485,34 @@ export function ClassSheet({
                 {(
                   [
                     ["one", "This class only"],
-                    ["future", "This and all future classes"],
+                    ["future", s.laterInSeries ? `This and the ${s.laterInSeries} after it` : "This and all later classes"],
                   ] as const
                 ).map(([id, label]) => (
                   <label key={id} className="sd-radio-card" style={{ flex: "1 1 220px" }}>
                     <input type="radio" name="move-scope" checked={moveScope === id} onChange={() => setMoveScope(id)} />
-                    <strong>{label}</strong>
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <strong>{label}</strong>
+                      {id === "future" && <span className="sd-hint">Each later class moves by the same number of days, to the same time.</span>}
+                    </span>
                   </label>
                 ))}
               </div>
             </fieldset>
           )}
           <div style={{ padding: "14px 16px", borderRadius: 16, background: "oklch(96% 0.01 70)", fontSize: 14.5 }}>
-            {`The class and its bookings stay as they are. ${s.roster.length ? `All ${bookedLabel} get ${smsOn ? "an SMS and email" : "an email"} with the new address` : "Anyone who books from now sees the new address"}, and anyone who can't make the new location can cancel free.`}
+            {s.roster.length
+              ? `Bookings move with the class. All ${bookedLabel} get ${smsOn ? "an SMS and email" : "an email"} with the change, and anyone who can't make it can cancel free, whatever your cancellation policy says.`
+              : "Nobody's booked yet, so nobody needs telling. Anyone who books from now sees the new details."}
           </div>
           {smsNumber && (
             <div className="sd-hint">
               Teachers can also text <strong>move {s.textKey} to redfern hall</strong>
-              {textLine}.
+              {textLine} to change the venue.
             </div>
           )}
           <div>
-            <button type="submit" className="sd-btn" disabled={pending || !moveVenue}>
-              {pending ? "Moving…" : "Move class and tell students"}
+            <button type="submit" className="sd-btn" disabled={pending}>
+              {pending ? "Saving…" : s.roster.length ? "Save and tell students" : "Save changes"}
             </button>
           </div>
         </form>
@@ -491,13 +522,34 @@ export function ClassSheet({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            run(() => cancelClassFromSheetAction(s.id, reason), (r) => {
+            run(() => cancelClassFromSheetAction(s.id, reason, cancelScope), (r) => {
               if (r?.ok) setToast(r.message);
               router.push("/studio", { scroll: false });
             });
           }}
           style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 720 }}
         >
+          {s.hasSeries && (
+            <fieldset style={{ border: 0, margin: 0, padding: 0 }}>
+              <legend style={{ fontWeight: 800, fontSize: 16, marginBottom: 10, padding: 0 }}>Which classes</legend>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {(
+                  [
+                    ["one", "This class only"],
+                    ["future", s.laterInSeries ? `This and the ${s.laterInSeries} after it` : "This and all later classes"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <label key={id} className="sd-radio-card" style={{ flex: "1 1 220px" }}>
+                    <input type="radio" name="cancel-scope" checked={cancelScope === id} onChange={() => setCancelScope(id)} />
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <strong>{label}</strong>
+                      {id === "future" && <span className="sd-hint">The class comes off your timetable. Nothing new is scheduled.</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <label style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 360 }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>Reason (shown to students)</span>
             <select className="su-fld" value={reason} onChange={(e) => setReason(e.target.value)}>
@@ -511,9 +563,11 @@ export function ClassSheet({
           <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "16px 18px", borderRadius: 16, background: "oklch(96% 0.01 70)" }}>
             <strong>What students see: same studio first</strong>
             <span>
-              {s.roster.length
-                ? `${bookedLabel} get a full refund to their original payment, or their credit back. Before anything else, StepUp shows them your other classes:`
-                : "Nobody's booked yet. Anyone on the waitlist is told, and shown your other classes:"}
+              {cancelScope === "future"
+                ? "Everyone booked into this class or a later one gets a full refund to their original payment, or their credit back. Before anything else, StepUp shows them your other classes:"
+                : s.roster.length
+                  ? `${bookedLabel} get a full refund to their original payment, or their credit back. Before anything else, StepUp shows them your other classes:`
+                  : "Nobody's booked yet. Anyone on the waitlist is told, and shown your other classes:"}
             </span>
             {s.recovery.length ? (
               <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
@@ -534,7 +588,7 @@ export function ClassSheet({
           )}
           <div>
             <button type="submit" className="sd-btn" disabled={pending} style={{ background: "oklch(48% 0.17 30)" }}>
-              {pending ? "Cancelling…" : "Cancel this class"}
+              {pending ? "Cancelling…" : cancelScope === "future" ? "Cancel these classes" : "Cancel this class"}
             </button>
           </div>
         </form>
@@ -584,4 +638,17 @@ function MarkButton({
       {children}
     </button>
   );
+}
+
+/** The lengths a class can be rescheduled to, its current one included. */
+function lengthOptions(current: number): number[] {
+  return [...new Set([...LENGTHS.map((l) => l.min), 120, current])].sort((a, b) => a - b);
+}
+
+function lengthLabel(min: number): string {
+  const known = LENGTHS.find((l) => l.min === min);
+  if (known) return known.label;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h ? `${h}h${m ? ` ${m}m` : ""}` : `${m} min`;
 }

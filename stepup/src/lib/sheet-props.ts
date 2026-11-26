@@ -2,7 +2,7 @@ import type { SheetProps } from "@/components/studio/ClassSheet";
 import type { ClassSheetData } from "@/lib/studio-data";
 import { MARK_FROM_MINUTES } from "@/lib/attendance";
 import { textKeyFor } from "@/lib/text-commands";
-import { formatClassWhen } from "@/lib/time";
+import { dateKeyInTimeZone, formatClassWhen, toFormFields } from "@/lib/time";
 import { sentAt } from "@/lib/studio-format";
 
 /** A class sheet's data, shaped for the dashboard or a teacher's class list. */
@@ -35,6 +35,13 @@ export function toSheetProps(s: ClassSheetData, opts: { canManage: boolean; now?
     past: s.startTime.getTime() + 3 * 60 * 60_000 < now.getTime(),
     canMark: !s.cancelledAt && s.startTime.getTime() - now.getTime() <= MARK_FROM_MINUTES * 60_000,
     hasSeries: Boolean(s.seriesId),
+    laterInSeries: s.laterInSeries,
     canManage: opts.canManage,
+    edit: {
+      ...toFormFields(s.startTime, s.timezone),
+      durationMin: s.durationMin,
+      venue: s.venueId ?? "studio",
+      today: dateKeyInTimeZone(now, s.timezone),
+    },
   };
 }

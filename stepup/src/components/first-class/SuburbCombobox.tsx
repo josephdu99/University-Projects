@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { C } from "@/lib/marketing-theme";
-import { findSuburb, searchSuburbs } from "@/lib/suburbs";
+import { findSuburb, searchSuburbs, type Suburb } from "@/lib/suburbs";
 
-const HIGHLIGHT = "oklch(94% 0.045 65)";
+export const HIGHLIGHT = "oklch(94% 0.045 65)";
 
 /**
  * Suburb search for question 3: an accessible combobox over the Sydney
@@ -206,91 +206,17 @@ export function SuburbCombobox({
         )}
 
         {open && (
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: form ? 60 : 66,
-              zIndex: 20,
-              borderRadius: 18,
-              background: "oklch(99.5% 0.004 70)",
-              border: `1.5px solid ${C.ink}`,
-              boxShadow: "0 24px 40px -20px oklch(22% 0.02 60 / 0.45)",
-              overflow: "hidden",
-            }}
-          >
-            <ul
-              id={listId}
-              role="listbox"
-              aria-label="Sydney suburbs"
-              style={{
-                listStyle: "none",
-                margin: 0,
-                padding: matches.length ? 6 : 0,
-                maxHeight: 304,
-                overflowY: "auto",
-              }}
-            >
-              {matches.map((s, i) => (
-                <li
-                  key={s.name}
-                  id={optionId(i)}
-                  role="option"
-                  aria-selected={i === active}
-                  // mousedown with preventDefault: picking must not blur the
-                  // input first, or the list would close before the pick.
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    pick(s.name);
-                  }}
-                  onMouseEnter={() => setHi(i)}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    cursor: "pointer",
-                    background: i === active ? HIGHLIGHT : "transparent",
-                  }}
-                >
-                  <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                    <span style={{ fontWeight: 700, fontSize: 16 }}>{s.name}</span>
-                    <span style={{ fontSize: 13, color: "oklch(45% 0.02 60)" }}>
-                      NSW {s.postcode} · {s.area}
-                    </span>
-                  </span>
-                  {studioSuburbs.includes(s.name) && (
-                    <span
-                      style={{
-                        flexShrink: 0,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        background: HIGHLIGHT,
-                        color: "oklch(45% 0.15 38)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      Studio here
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {matches.length === 0 && (
-              <div
-                role="status"
-                style={{ padding: "14px 18px", fontSize: 15, color: "oklch(42% 0.02 60)" }}
-              >
-                No Sydney suburbs match &ldquo;{text.trim()}&rdquo;. Try a nearby
-                suburb or postcode.
-              </div>
-            )}
-          </div>
+          <SuburbOptions
+            listId={listId}
+            optionId={optionId}
+            matches={matches}
+            active={active}
+            studioSuburbs={studioSuburbs}
+            text={text}
+            top={form ? 60 : 66}
+            onPick={pick}
+            onHover={setHi}
+          />
         )}
       </div>
       {hint && (
@@ -304,6 +230,115 @@ export function SuburbCombobox({
         >
           {hint}
         </span>
+      )}
+    </div>
+  );
+}
+
+/** The popup list of suburbs both pickers show while typing. */
+export function SuburbOptions({
+  listId,
+  optionId,
+  matches,
+  active,
+  studioSuburbs,
+  text,
+  top,
+  onPick,
+  onHover,
+}: {
+  listId: string;
+  optionId: (i: number) => string;
+  matches: Suburb[];
+  active: number;
+  studioSuburbs: string[];
+  text: string;
+  top: number | string;
+  onPick: (name: string) => void;
+  onHover: (i: number) => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top,
+        zIndex: 20,
+        borderRadius: 18,
+        background: "oklch(99.5% 0.004 70)",
+        border: `1.5px solid ${C.ink}`,
+        boxShadow: "0 24px 40px -20px oklch(22% 0.02 60 / 0.45)",
+        overflow: "hidden",
+      }}
+    >
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label="Sydney suburbs"
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: matches.length ? 6 : 0,
+          maxHeight: 304,
+          overflowY: "auto",
+        }}
+      >
+        {matches.map((s, i) => (
+          <li
+            key={s.name}
+            id={optionId(i)}
+            role="option"
+            aria-selected={i === active}
+            // mousedown with preventDefault: picking must not blur the
+            // input first, or the list would close before the pick.
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onPick(s.name);
+            }}
+            onMouseEnter={() => onHover(i)}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              padding: "10px 12px",
+              borderRadius: 12,
+              cursor: "pointer",
+              background: i === active ? HIGHLIGHT : "transparent",
+            }}
+          >
+            <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 16 }}>{s.name}</span>
+              <span style={{ fontSize: 13, color: "oklch(45% 0.02 60)" }}>
+                NSW {s.postcode} · {s.area}
+              </span>
+            </span>
+            {studioSuburbs.includes(s.name) && (
+              <span
+                style={{
+                  flexShrink: 0,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  background: HIGHLIGHT,
+                  color: "oklch(45% 0.15 38)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Studio here
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {matches.length === 0 && (
+        <div role="status" style={{ padding: "14px 18px", fontSize: 15, color: "oklch(42% 0.02 60)" }}>
+          {text.trim()
+            ? <>No Sydney suburbs match &ldquo;{text.trim()}&rdquo;. Try a nearby suburb or postcode.</>
+            : "Every suburb that matches is already added."}
+        </div>
       )}
     </div>
   );

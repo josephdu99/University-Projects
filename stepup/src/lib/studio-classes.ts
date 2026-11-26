@@ -8,8 +8,8 @@ type Tx = Prisma.TransactionClient;
 
 /**
  * Write a studio class from the v6.4 form: a one-off, a weekly or fortnightly
- * series for the scheduling horizon, or a course (weekly from its term start,
- * for its number of weeks, sold as one purchase).
+ * series for the scheduling horizon (one for each day picked), or a course
+ * (weekly from its term start, for its number of weeks, sold as one purchase).
  */
 export async function createStudioClass(
   tx: Tx,
@@ -63,42 +63,63 @@ export async function createStudioClass(
   };
   const room = ctx.room?.trim().slice(0, 40) || null;
 
-  let starts: Date[];
-  if (listing === "COURSE") {
-    const weeks = Number(d.weeks);
-    starts = Array.from({ length: weeks }, (_, i) =>
-      zonedDateTimeToUtc(addDaysToDateString(d.termStart, i * 7), d.time, ctx.timezone),
-    );
-  } else {
-    starts = sessionStarts(now, d.day, d.time, d.repeat, ctx.timezone);
-  }
+  // A course runs weekly from its term start. Anything else gets one class,
+  // or one series, for each day picked: Mon and Wed are two on the timetable.
+  const plans: { starts: Date[]; dayOfWeek: number; repeating: boolean }[] =
+    listing === "COURSE"
+      ? [
+          (() => {
+            const starts = Array.from({ length: Number(d.weeks) }, (_, i) =>
+              zonedDateTimeToUtc(addDaysToDateString(d.termStart, i * 7), d.time, ctx.timezone),
+            );
+            return { starts, dayOfWeek: dayOfWeekInTimeZone(starts[0], ctx.timezone), repeating: true };
+          })(),
+        ]
+      : d.days.map((day) => ({
+          starts: sessionStarts(now, day, d.time, d.repeat, ctx.timezone),
+          dayOfWeek: DAYS.find((x) => x.id === day)!.dow,
+          repeating: d.repeat !== "once",
+        }));
 
-  let seriesId: string | null = null;
-  if (listing === "COURSE" || d.repeat !== "once") {
-    const series = await tx.classSeries.create({
-      data: {
-        ...shared,
-        dayOfWeek:
-          listing === "COURSE"
-            ? dayOfWeekInTimeZone(starts[0], ctx.timezone)
-            : DAYS.find((x) => x.id === d.day)!.dow,
-        localTime: d.time,
-        frequency: listing !== "COURSE" && d.repeat === "fortnightly" ? "FORTNIGHTLY" : "WEEKLY",
-        startsOn: starts[0],
-        endsOn: starts[starts.length - 1],
-        courseWeeks: listing === "COURSE" ? Number(d.weeks) : null,
-        coursePriceCents: listing === "COURSE" ? Number(d.coursePrice) * 100 : null,
-      },
-      select: { id: true },
+  const made: { firstId: string; firstStart: Date; sessions: number; seriesId: string | null }[] = [];
+  for (const plan of plans) {
+    const { starts } = plan;
+    let seriesId: string | null = null;
+    if (plan.repeating) {
+      const series = await tx.classSeries.create({
+        data: {
+          ...shared,
+          dayOfWeek: plan.dayOfWeek,
+          localTime: d.time,
+          frequency: listing !== "COURSE" && d.repeat === "fortnightly" ? "FORTNIGHTLY" : "WEEKLY",
+          startsOn: starts[0],
+          endsOn: starts[starts.length - 1],
+          courseWeeks: listing === "COURSE" ? Number(d.weeks) : null,
+          coursePriceCents: listing === "COURSE" ? Number(d.coursePrice) * 100 : null,
+        },
+        select: { id: true },
+      });
+      seriesId = series.id;
+    }
+    await tx.danceClass.createMany({ data: starts.map((startTime) => ({ ...shared, room, seriesId, startTime })) });
+    const first = await tx.danceClass.findFirstOrThrow({
+      where: { hostId: ctx.hostId, title, startTime: starts[0], seriesId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, startTime: true },
     });
-    seriesId = series.id;
+    made.push({ firstId: first.id, firstStart: first.startTime, sessions: starts.length, seriesId });
   }
+  if (!made.length) throw new Error("No day picked for this class.");
 
-  await tx.danceClass.createMany({ data: starts.map((startTime) => ({ ...shared, room, seriesId, startTime })) });
-  const first = await tx.danceClass.findFirstOrThrow({
-    where: { hostId: ctx.hostId, title, startTime: starts[0], seriesId },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, startTime: true },
-  });
-  return { firstId: first.id, firstStart: first.startTime, sessions: starts.length, title, seriesId };
+  const soonest = [...made].sort((a, b) => a.firstStart.getTime() - b.firstStart.getTime())[0];
+  return {
+    firstId: soonest.firstId,
+    firstStart: soonest.firstStart,
+    sessions: made.reduce((n, m) => n + m.sessions, 0),
+    title,
+    /** The first day's series, for callers that make one day at a time. */
+    seriesId: made[0].seriesId,
+    seriesIds: made.flatMap((m) => (m.seriesId ? [m.seriesId] : [])),
+    classes: made.length,
+  };
 }

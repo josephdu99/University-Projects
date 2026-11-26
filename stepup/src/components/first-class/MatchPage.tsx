@@ -5,19 +5,20 @@ import Link from "next/link";
 import { C, DISPLAY } from "@/lib/marketing-theme";
 import {
   GOALS,
+  MAX_SUBURBS,
   MUSIC,
   WHEN,
   answerChips,
   opennessOf,
   outOfReach,
+  pickedSuburbs,
   questionsDone,
   rankClasses,
   type Answers,
 } from "@/lib/first-class";
-import { findSuburb } from "@/lib/suburbs";
 import { Wordmark } from "./FunnelChrome";
 import { MatchCard, MatchRow } from "./MatchCard";
-import { SuburbCombobox } from "./SuburbCombobox";
+import { SuburbChips } from "./SuburbChips";
 import { useStoredAnswers } from "./useStoredAnswers";
 import type { LiveCandidate, MatchCandidate } from "./match-types";
 
@@ -167,8 +168,8 @@ export function MatchPage({
   const done = questionsDone(answers);
   const answered = done.filter(Boolean).length;
   const chips = answerChips(answers);
-  const picked = findSuburb(answers.where);
-  const hiddenElsewhere = picked
+  const picked = pickedSuburbs(answers.where);
+  const hiddenElsewhere = picked.length
     ? live.filter((c) => opennessOf(c.level) && outOfReach(c, answers.where)).length
     : 0;
 
@@ -297,7 +298,7 @@ export function MatchPage({
           </div>
         </Question>
 
-        <Question n={2} title="What kind of music do you like?" sub="Your gut answer is the right one.">
+        <Question n={2} title="What kind of music do you like?" sub="Pick as many as you like. Your gut answer is the right one.">
           <div
             style={{
               display: "grid",
@@ -306,14 +307,13 @@ export function MatchPage({
             }}
           >
             {MUSIC.map((m) => {
-              const on = answers.music === m.id;
+              const on = answers.music.includes(m.id);
               return (
                 <button
                   key={m.id}
                   type="button"
                   aria-pressed={on}
-                  // Clicking the chosen one again clears it.
-                  onClick={() => update({ music: on ? null : m.id })}
+                  onClick={() => update({ music: toggle(answers.music, m.id) })}
                   style={cardStyle(on)}
                 >
                   <span style={{ fontFamily: DISPLAY, fontWeight: 700, fontSize: 18, letterSpacing: "-0.01em" }}>
@@ -339,12 +339,11 @@ export function MatchPage({
               alignItems: "start",
             }}
           >
-            <SuburbCombobox
-              value={answers.where}
+            <SuburbChips
+              values={answers.where}
               studioSuburbs={studioSuburbs}
-              onPick={(name) => {
-                if (name !== answers.where) update({ where: name });
-              }}
+              max={MAX_SUBURBS}
+              onChange={(where) => update({ where })}
             />
             <div
               role="group"
@@ -445,7 +444,7 @@ export function MatchPage({
           {hiddenElsewhere > 0 && (
             <p style={{ margin: 0, fontSize: 14, color: C.inkSoft }}>
               {hiddenElsewhere} in-person {hiddenElsewhere === 1 ? "class" : "classes"} outside
-              Sydney {hiddenElsewhere === 1 ? "is" : "are"} hidden while a Sydney suburb is picked.
+              Sydney {hiddenElsewhere === 1 ? "is" : "are"} hidden while {picked.length === 1 ? "a Sydney suburb is" : "Sydney suburbs are"} picked.
             </p>
           )}
         </div>

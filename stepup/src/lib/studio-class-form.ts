@@ -6,14 +6,14 @@
  * form as you type and by the server before it saves anything.
  */
 import { isMusic } from "@/lib/first-class";
-import { isClockTime, isDay, isRepeat, type DayId, type RepeatId } from "@/lib/class-form";
-import { isListing, MAX_COURSE_WEEKS, type Listing } from "@/lib/listing";
+import { DAYS, isClockTime, isDay, isRepeat, type DayId, type RepeatId } from "@/lib/class-form";
+import { isListing, MAX_COURSE_WEEKS, type ListingChoice } from "@/lib/listing";
 import { isScaleLevel } from "@/lib/levels";
 import { isPartnerRule, type PartnerRule } from "@/lib/partner-roles";
 import { isPolicy, type PolicyId } from "@/lib/policies";
 
 export type StudioClassDraft = {
-  listing: Listing;
+  listing: ListingChoice;
   title: string;
   teacher: string;
   style: string;
@@ -28,7 +28,8 @@ export type StudioClassDraft = {
   leadCap: string;
   followCap: string;
   balanceX: string;
-  day: DayId;
+  /** One class (or series) is made for each day picked. Not used by courses. */
+  days: DayId[];
   time: string;
   dur: string;
   repeat: RepeatId;
@@ -61,7 +62,7 @@ export const BLANK_STUDIO_CLASS: StudioClassDraft = {
   leadCap: "8",
   followCap: "8",
   balanceX: "2",
-  day: "Tue",
+  days: ["Tue"],
   time: "19:00",
   dur: "60",
   repeat: "weekly",
@@ -97,6 +98,7 @@ export function studioClassProblems(
   if (!d.style.trim()) out.push("a style");
   if (!isScaleLevel(d.level)) out.push("a level");
   if (!isMusic(d.music)) out.push("the music");
+  if (d.listing !== "COURSE" && !d.days.some(isDay)) out.push("a day");
   if (!isClockTime(d.time)) out.push("a start time");
   if (d.desc.length > DESC_MAX) out.push("a shorter description");
 
@@ -135,14 +137,13 @@ export function studioClassProblems(
     if (x === null || x > 10) out.push("how many extra on either side (0 to 10)");
   }
   if (d.kids && !ctx.teacherWwccOk) out.push("a verified Working With Children Check for the teacher");
-  if (d.listing !== "HIDDEN" && !d.promise.every(Boolean)) out.push("the First Timer promise");
+  if (!d.promise.every(Boolean)) out.push("the First Timer promise");
   return out;
 }
 
 export function studioDraftFromForm(get: (k: string) => string | null): StudioClassDraft {
   const s = (k: string) => get(k) ?? "";
   const listing = s("listing");
-  const day = s("day");
   const repeat = s("repeat");
   const rule = s("rule");
   const policy = s("policy");
@@ -162,7 +163,7 @@ export function studioDraftFromForm(get: (k: string) => string | null): StudioCl
     leadCap: s("leadCap"),
     followCap: s("followCap"),
     balanceX: s("balanceX"),
-    day: isDay(day) ? day : "Tue",
+    days: sortDays(s("days").split(",")),
     time: s("time"),
     dur: s("dur") || "60",
     repeat: isRepeat(repeat) ? repeat : "weekly",
@@ -178,10 +179,19 @@ export function studioDraftFromForm(get: (k: string) => string | null): StudioCl
   };
 }
 
+/** Known days only, once each, Monday first. */
+export function sortDays(xs: readonly string[]): DayId[] {
+  return DAYS.map((d) => d.id).filter((id) => xs.includes(id));
+}
+
 export function studioDraftToFormData(d: StudioClassDraft): FormData {
   const fd = new FormData();
   for (const [k, v] of Object.entries(d)) {
     if (k === "promise") continue;
+    if (k === "days") {
+      fd.set(k, d.days.join(","));
+      continue;
+    }
     if (typeof v === "boolean") {
       if (v) fd.set(k, "on");
     } else fd.set(k, String(v));

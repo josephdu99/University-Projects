@@ -7,6 +7,7 @@ import { requireStudioAccess, studioPerms } from "@/lib/studio-access";
 import { VerifyBanner } from "@/components/VerifyBanner";
 import { StudioHome } from "@/components/studio/StudioHome";
 import type { SheetProps } from "@/components/studio/ClassSheet";
+import { isSheetTab } from "@/lib/sheet-tabs";
 import { imageUrl } from "@/lib/images";
 import { DANCE_STYLES, DAYS, LENGTHS } from "@/lib/class-form";
 import { isMusic } from "@/lib/first-class";
@@ -37,7 +38,7 @@ export const metadata = { title: "Studio, StepUp" };
 export default async function StudioDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ create?: string; from?: string; class?: string; import?: string }>;
+  searchParams: Promise<{ create?: string; from?: string; class?: string; import?: string; tab?: string }>;
 }) {
   const access = await requireStudioAccess();
   const { user, studio } = access;
@@ -102,7 +103,7 @@ export default async function StudioDashboardPage({
         leadCap: String(src.leadCap ?? 8),
         followCap: String(src.followCap ?? 8),
         balanceX: String(src.balanceX ?? 2),
-        day: DAYS.find((d) => d.dow === dow)?.id ?? "Tue",
+        days: [DAYS.find((d) => d.dow === dow)?.id ?? "Tue"],
         time: toFormFields(src.startTime, src.timezone).time,
         dur: LENGTHS.some((l) => l.min === src.durationMin) ? String(src.durationMin) : "60",
         repeat: src.series ? (src.series.frequency === "FORTNIGHTLY" ? "fortnightly" : "weekly") : "once",
@@ -193,6 +194,7 @@ export default async function StudioDashboardPage({
         }}
         students={{ total: studentRows.length, once, returned: studentRows.length - once, faces }}
         openId={sheet?.id ?? null}
+        openTab={isSheetTab(params.tab) ? params.tab : "list"}
         sheet={sheet}
         sheetVenues={venueOpts}
         smsOn={smsConfigured()}

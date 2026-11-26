@@ -709,6 +709,10 @@ export function ImportPanel({ studioName, ctx, claudeOn, sheet, changes }: Impor
             <li>New rows, and changes to classes nobody has booked yet, are applied automatically.</li>
             <li>If a class with bookings changes or disappears from the sheet, nothing happens to students until you approve it here.</li>
             <li>One-off rows are created once and not synced afterwards; change those on StepUp.</li>
+            <li>
+              Rescheduled or cancelled a synced class on StepUp? That holds. A cancelled class stays cancelled while its row is still in your
+              sheet, and a rescheduled one keeps its new time until you change that row.
+            </li>
           </ul>
         </details>
       )}

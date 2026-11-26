@@ -2,7 +2,8 @@ import { createHmac } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { checkClassList, checkUnsubscribe, classListPath, unsubscribePath } from "@/lib/signed-links";
 import { cutoffLabel, cutoffSentence } from "@/lib/policy-copy";
-import { studioClassProblems, BLANK_STUDIO_CLASS } from "@/lib/studio-class-form";
+import { studioClassProblems, BLANK_STUDIO_CLASS, sortDays, studioDraftFromForm, studioDraftToFormData } from "@/lib/studio-class-form";
+import { LISTINGS, listingLabel } from "@/lib/listing";
 
 beforeAll(() => {
   process.env.AUTH_SECRET = "test-secret-for-signed-links";
@@ -100,7 +101,30 @@ describe("create a class (v6.4)", () => {
     expect(studioClassProblems(course, { ...ctx, canCharge: false })).toContain("payouts set up (courses are paid)");
   });
 
-  it("a class kept off StepUp doesn't need the First Timer promise", () => {
-    expect(studioClassProblems({ ...ok, listing: "HIDDEN", promise: [false, false, false] }, ctx)).toEqual([]);
+  it("every new class needs the First Timer promise", () => {
+    expect(studioClassProblems({ ...ok, promise: [true, false, true] }, ctx)).toContain("the First Timer promise");
+  });
+
+  it("\"Not listed\" can't be picked any more: the form falls back to drop-in", () => {
+    const d = studioDraftFromForm((k) => (k === "listing" ? "HIDDEN" : null));
+    expect(d.listing).toBe("DROP_IN");
+    expect(LISTINGS.map((l) => l.id)).toEqual(["DROP_IN", "TRIAL", "COURSE"]);
+    expect(listingLabel("HIDDEN")).toBe("Not listed");
+  });
+
+  it("a class can run on several days, and needs at least one", () => {
+    expect(studioClassProblems({ ...ok, days: ["Mon", "Wed"] }, ctx)).toEqual([]);
+    expect(studioClassProblems({ ...ok, days: [] }, ctx)).toContain("a day");
+    // A course takes its weekday from the term start instead.
+    const course = { ...ok, listing: "COURSE" as const, weeks: "8", coursePrice: "160", termStart: "2026-12-01", days: [] };
+    expect(studioClassProblems(course, ctx)).toEqual([]);
+  });
+
+  it("days go through the form once each, Monday first", () => {
+    const fd = studioDraftToFormData({ ...ok, days: ["Wed", "Mon"] });
+    expect(fd.get("days")).toBe("Wed,Mon");
+    const back = studioDraftFromForm((k) => (k === "days" ? "Wed,Mon,Wed,Funday" : null));
+    expect(back.days).toEqual(["Mon", "Wed"]);
+    expect(sortDays(["Sun", "Tue", "Sun"])).toEqual(["Tue", "Sun"]);
   });
 });

@@ -1,10 +1,12 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appUrl } from "@/lib/email";
-import { sendClassMessage, sendCourseOpen, sendPassOffer, sendVenueChanged } from "@/lib/email-studio";
+import { sendClassMessage, sendClassRescheduled, sendCourseOpen, sendPassOffer, sendVenueChanged } from "@/lib/email-studio";
 import { sendSms, smsConfigured } from "@/lib/sms";
 import { unsubscribePath } from "@/lib/signed-links";
 import { findSuburb, suburbFromAddress } from "@/lib/suburbs";
-import { formatClassWhen } from "@/lib/time";
+import { dayOfWeekInTimeZone, formatClassWhen } from "@/lib/time";
+import { planReschedule, rescheduleChanges, rescheduleProblem } from "@/lib/reschedule";
 import { logError } from "@/lib/logger";
 
 /**
@@ -117,6 +119,127 @@ export async function moveClass(
   return `${moved[0]?.title ?? "Class"} ${future ? "(this and all future classes)" : "(this class only)"} moved to ${v.name}. ${people(
     bookings.length,
   )} told by ${smsConfigured() ? "SMS and email" : "email"}.`;
+}
+
+/**
+ * Reschedule one class, or it and every later class in its series: a new
+ * date and start time, length or venue. Bookings move with it. Everyone
+ * booked is told by email (and SMS once it's set up), and may cancel free
+ * afterwards whatever the policy says (the class's venueChangedAt is later
+ * than their booking).
+ */
+export async function rescheduleClass(
+  c: { id: string; seriesId: string | null; startTime: Date; timezone: string; durationMin: number; venueId: string | null },
+  input: { date: string; time: string; durationMin: number; venue: ResolvedVenue; future: boolean },
+  now = new Date(),
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const future = input.future && Boolean(c.seriesId);
+  const sessionSelect = {
+    id: true,
+    title: true,
+    startTime: true,
+    bookings: { where: { status: { in: ["BOOKED", "PENDING_PAYMENT"] } }, select: { user: { select: { email: true, phone: true } } } },
+  } satisfies Prisma.DanceClassSelect;
+  const sessions = future
+    ? await db.danceClass.findMany({
+        where: { seriesId: c.seriesId, startTime: { gte: c.startTime }, cancelledAt: null },
+        orderBy: { startTime: "asc" },
+        select: sessionSelect,
+      })
+    : await db.danceClass.findMany({ where: { id: c.id }, select: sessionSelect });
+  // The class picked always goes first.
+  sessions.sort((a, b) => (a.id === c.id ? -1 : b.id === c.id ? 1 : a.startTime.getTime() - b.startTime.getTime()));
+  const plan = planReschedule({ sessions, timezone: c.timezone, date: input.date, time: input.time });
+
+  const moving = new Set(plan.map((m) => m.id));
+  const others = c.seriesId
+    ? (
+        await db.danceClass.findMany({
+          where: { seriesId: c.seriesId, cancelledAt: null, startTime: { gte: now } },
+          select: { id: true, startTime: true },
+        })
+      )
+        .filter((o) => !moving.has(o.id))
+        .map((o) => o.startTime)
+    : [];
+  const problem = rescheduleProblem({ ...input, timezone: c.timezone, now, plan, others });
+  if (problem) return { ok: false, error: problem };
+
+  const changed = rescheduleChanges({ plan, current: c, durationMin: input.durationMin, venueId: input.venue.id });
+  if (!changed.time && !changed.length && !changed.venue) return { ok: false, error: "Nothing's changed yet." };
+
+  const venueData = { venueId: input.venue.id, location: input.venue.location, suburb: input.venue.suburb };
+  await db.$transaction(async (tx) => {
+    for (const m of plan) {
+      await tx.danceClass.update({
+        where: { id: m.id },
+        data: {
+          startTime: m.newStart,
+          durationMin: input.durationMin,
+          ...venueData,
+          venueChangedAt: now,
+          // The teacher's class list goes out again for the new time.
+          ...(m.newStart.getTime() !== m.oldStart.getTime() ? { teacherListSentAt: null } : {}),
+        },
+      });
+    }
+    if (future && c.seriesId) {
+      await tx.classSeries.update({
+        where: { id: c.seriesId },
+        data: { dayOfWeek: dayOfWeekInTimeZone(plan[0].newStart, c.timezone), localTime: input.time, durationMin: input.durationMin, ...venueData },
+      });
+    }
+  });
+
+  let told = 0;
+  for (const m of plan) {
+    const s = sessions.find((x) => x.id === m.id)!;
+    for (const b of s.bookings) {
+      told++;
+      const classUrl = appUrl(`/first-class/${m.id}`);
+      if (b.user.email) {
+        if (changed.time || changed.length) {
+          await sendClassRescheduled({
+            to: b.user.email,
+            classTitle: s.title,
+            oldStart: m.oldStart,
+            newStart: m.newStart,
+            timezone: c.timezone,
+            classUrl,
+            durationMin: changed.length ? input.durationMin : undefined,
+            venue: changed.venue ? { name: input.venue.name, address: input.venue.location } : null,
+          }).catch((err) => logError("email.classRescheduled", err));
+        } else {
+          await sendVenueChanged({
+            to: b.user.email,
+            classTitle: s.title,
+            startTime: m.newStart,
+            timezone: c.timezone,
+            venueName: input.venue.name,
+            address: input.venue.location,
+            classUrl,
+          }).catch((err) => logError("email.venueChanged", err));
+        }
+      }
+      const when = formatClassWhen(m.newStart, c.timezone);
+      const sms = changed.time
+        ? `${s.title} has a new time: ${when}${changed.venue ? `, at ${input.venue.name}` : ""}. Can't make it? Cancel free in StepUp.`
+        : changed.venue
+          ? `${s.title}, ${when}, has moved to ${input.venue.name}, ${input.venue.location}. Can't make it? Cancel free in StepUp.`
+          : `${s.title}, ${when}, now runs for ${input.durationMin} minutes. Can't make it? Cancel free in StepUp.`;
+      await sendSms(b.user.phone, sms).catch(() => false);
+    }
+  }
+
+  const title = sessions[0]?.title ?? "Class";
+  const what = changed.time ? `moved to ${formatClassWhen(plan[0].newStart, c.timezone)}` : changed.venue ? `moved to ${input.venue.name}` : `now runs for ${input.durationMin} minutes`;
+  const scope = plan.length > 1 ? ` (this and ${plan.length - 1} later ${plan.length === 2 ? "class" : "classes"})` : "";
+  return {
+    ok: true,
+    message: `${title}${scope} ${what}. ${
+      told ? `${people(told)} told by ${smsConfigured() ? "SMS and email" : "email"}, and anyone who can't make it can cancel free.` : "Nobody was booked yet."
+    }`,
+  };
 }
 
 /** People who asked to hear when this studio's next course in a style opens. */

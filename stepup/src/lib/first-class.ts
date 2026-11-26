@@ -13,7 +13,7 @@
  * to invent first.
  */
 
-import { findSuburb } from "@/lib/suburbs";
+import { findSuburb, type Suburb } from "@/lib/suburbs";
 
 export type GoalId = "fun" | "fitness" | "meet" | "confidence" | "date";
 export type MusicId = "latin" | "hiphop" | "classical" | "afro" | "any";
@@ -21,18 +21,35 @@ export type WhenId = "weekday" | "weekend" | "lunch";
 
 export type Answers = {
   goals: GoalId[];
-  music: MusicId | null;
-  /** A suburb from `SUBURBS`, by name, or "" until one has been picked. */
-  where: string;
+  /** Any number of tastes. A class that fits one of them matches. */
+  music: MusicId[];
+  /** Suburbs from `SUBURBS`, by name: home, work, wherever suits. */
+  where: string[];
   when: WhenId[];
 };
 
 export const EMPTY_ANSWERS: Answers = {
   goals: [],
-  music: null,
-  where: "",
+  music: [],
+  where: [],
   when: [],
 };
+
+/** How many suburbs the "where" question takes. */
+export const MAX_SUBURBS = 5;
+
+type OneOrMany<T> = T | readonly T[] | null | undefined;
+const many = <T,>(x: OneOrMany<T>): T[] => (x == null ? [] : Array.isArray(x) ? [...x] : [x as T]);
+
+/** The suburbs actually picked, once each, in the order given. */
+export function pickedSuburbs(where: OneOrMany<string>): Suburb[] {
+  const out: Suburb[] = [];
+  for (const w of many(where)) {
+    const s = findSuburb(w);
+    if (s && !out.some((o) => o.name === s.name)) out.push(s);
+  }
+  return out;
+}
 
 /** Where the matcher keeps its answers, as the handoff specifies. */
 export const ANSWERS_STORAGE_KEY = "stepup-v6-match";
@@ -226,11 +243,15 @@ export function matchesWhen(
   return slot !== null && when.includes(slot);
 }
 
+/** Does the class fit any of the music picked? */
 export function matchesMusic(
   c: { style: string; music?: string | null },
-  music: MusicId | null,
+  music: OneOrMany<MusicId>,
 ): boolean {
-  if (!music) return false;
+  return many(music).some((m) => matchesOneMusic(c, m));
+}
+
+function matchesOneMusic(c: { style: string; music?: string | null }, music: MusicId): boolean {
   // What the host said beats what the style usually means: a contemporary
   // class danced to hip hop is a hip hop class to the person picking.
   if (c.music && isMusic(c.music)) {
@@ -244,20 +265,26 @@ export function matchesMusic(
 }
 
 /**
- * How close a class is to the suburb picked: 1 in the same suburb, 0.5 in
- * the same area, otherwise 0. Online classes are in no suburb, so they score
- * 0 here; they are never excluded for distance either.
+ * How close a class is to the nearest suburb picked: 1 in one of them, 0.5
+ * in the same area as one, otherwise 0. Online classes are in no suburb, so
+ * they score 0 here; they are never excluded for distance either.
  */
 export function nearness(
   c: Pick<CandidateClass, "suburb">,
-  where: string,
+  where: OneOrMany<string>,
 ): number {
-  const picked = findSuburb(where);
+  return closest(c, where)?.score ?? 0;
+}
+
+function closest(c: Pick<CandidateClass, "suburb">, where: OneOrMany<string>): { score: number; picked: Suburb } | null {
   const at = findSuburb(c.suburb);
-  if (!picked || !at) return 0;
-  if (at.name === picked.name) return 1;
-  if (at.area === picked.area) return 0.5;
-  return 0;
+  if (!at) return null;
+  let best: { score: number; picked: Suburb } | null = null;
+  for (const picked of pickedSuburbs(where)) {
+    const score = at.name === picked.name ? 1 : at.area === picked.area ? 0.5 : 0;
+    if (score > (best?.score ?? 0)) best = { score, picked };
+  }
+  return best;
 }
 
 /**
@@ -271,9 +298,9 @@ export function nearness(
  */
 export function outOfReach(
   c: Pick<CandidateClass, "format" | "suburb" | "studioCity" | "timezone">,
-  where: string,
+  where: OneOrMany<string>,
 ): boolean {
-  if (!findSuburb(where)) return false;
+  if (pickedSuburbs(where).length === 0) return false;
   if (c.format === "ONLINE" || c.suburb) return false;
   if (c.studioCity) return !/sydney/i.test(c.studioCity);
   return c.timezone !== "Australia/Sydney";
@@ -282,15 +309,15 @@ export function outOfReach(
 /**
  * The three questions' state, in order: has each been answered?
  *
- * The third counts only once a suburb has actually been picked from the list
- * (an exact match counts) and at least one time slot is on, as the handoff
- * specifies. Typing half a suburb name is not an answer.
+ * The third counts only once at least one suburb has actually been picked
+ * from the list (an exact match counts) and at least one time slot is on, as
+ * the handoff specifies. Typing half a suburb name is not an answer.
  */
 export function questionsDone(a: Answers): [boolean, boolean, boolean] {
   return [
     a.goals.length > 0,
-    a.music !== null,
-    findSuburb(a.where) !== null && a.when.length > 0,
+    a.music.length > 0,
+    pickedSuburbs(a.where).length > 0 && a.when.length > 0,
   ];
 }
 
@@ -311,9 +338,9 @@ const SLOT_REASON: Record<WhenId, string> = {
 };
 
 /**
- * Rank the candidates, with the handoff's scoring: +2 when the music matches,
- * +1 when the class is in a time slot you picked, and +1 when it is in your
- * suburb or +0.5 when it is in the same area. Ties go to a First Timer class
+ * Rank the candidates, with the handoff's scoring: +2 when the music matches
+ * any you picked, +1 when the class is in a time slot you picked, and +1 when
+ * it is in one of your suburbs or +0.5 when it is in the same area as one. Ties go to a First Timer class
  * over an all-levels one, then to the sooner class.
  *
  * Every reason names the fact that earned it, so a dancer can check the claim
@@ -324,7 +351,7 @@ export function rankClasses<T extends CandidateClass>(
   classes: T[],
   answers: Answers,
 ): ScoredClass<T>[] {
-  const picked = findSuburb(answers.where);
+  const picked = pickedSuburbs(answers.where);
 
   const scored = classes.flatMap((c) => {
     const openness = opennessOf(c.level);
@@ -334,17 +361,19 @@ export function rankClasses<T extends CandidateClass>(
     const reasons: string[] = [];
     let score = 0;
 
-    if (answers.music && matchesMusic(c, answers.music)) {
+    // The music picked that this class fits, the host's own word first.
+    const declared = c.music && isMusic(c.music) ? c.music : null;
+    const fit = declared && answers.music.includes(declared) ? declared : answers.music.find((m) => matchesOneMusic(c, m));
+    if (fit) {
       score += 2;
-      const declared = c.music && isMusic(c.music) ? c.music : null;
       reasons.push(
         declared && declared !== "any"
-          ? `It's danced to ${musicPhrase(declared)}${answers.music === declared ? ", which you picked" : ", which is upbeat"}.`
-          : answers.music === "any"
+          ? `It's danced to ${musicPhrase(declared)}${fit === declared ? ", which you picked" : ", which is upbeat"}.`
+          : fit === "any"
             ? `${c.style} is upbeat, which is what you asked for.`
             : declared === "any"
-              ? `It's danced to anything upbeat, ${musicPhrase(answers.music)} included.`
-              : `${c.style} sits in the ${musicLabel(answers.music)} you picked.`,
+              ? `It's danced to anything upbeat, ${musicPhrase(fit)} included.`
+              : `${c.style} sits in the ${musicLabel(fit)} you picked.`,
       );
     }
 
@@ -354,13 +383,13 @@ export function rankClasses<T extends CandidateClass>(
       reasons.push(SLOT_REASON[slot]);
     }
 
-    if (picked) {
-      const near = nearness(c, picked.name);
-      score += near;
-      if (near === 1) {
-        reasons.push(`In ${picked.name}, where you said.`);
-      } else if (near === 0.5) {
-        reasons.push(`In ${c.suburb}, the same part of Sydney as ${picked.name}.`);
+    if (picked.length) {
+      const near = closest(c, answers.where);
+      score += near?.score ?? 0;
+      if (near?.score === 1) {
+        reasons.push(`In ${near.picked.name}, where you said.`);
+      } else if (near?.score === 0.5) {
+        reasons.push(`In ${c.suburb}, the same part of Sydney as ${near.picked.name}.`);
       } else if (c.format === "ONLINE") {
         reasons.push("Online, so where you live doesn't matter.");
       }
@@ -408,8 +437,8 @@ export function rankClasses<T extends CandidateClass>(
 export function answerChips(a: Answers): string[] {
   return [
     ...a.goals.map(goalLabel),
-    a.music ? musicLabel(a.music) : "",
-    findSuburb(a.where)?.name ?? "",
+    ...a.music.map(musicLabel),
+    ...pickedSuburbs(a.where).map((s) => s.name),
     ...a.when.map(whenLabel),
   ].filter(Boolean);
 }
@@ -418,8 +447,9 @@ export function answerChips(a: Answers): string[] {
 export function answersToParams(a: Answers): URLSearchParams {
   const p = new URLSearchParams();
   if (a.goals.length) p.set("goals", a.goals.join(","));
-  if (a.music) p.set("music", a.music);
-  if (a.where.trim()) p.set("where", a.where.trim());
+  if (a.music.length) p.set("music", a.music.join(","));
+  const where = pickedSuburbs(a.where);
+  if (where.length) p.set("where", where.map((s) => s.name).join(","));
   if (a.when.length) p.set("when", a.when.join(","));
   return p;
 }
@@ -436,8 +466,8 @@ export function answersFromParams(p: {
 }): Answers {
   return {
     goals: unique((p.goals ?? "").split(",").filter(isGoal)),
-    music: p.music && isMusic(p.music) ? p.music : null,
-    where: findSuburb(p.where)?.name ?? "",
+    music: unique((p.music ?? "").split(",").filter(isMusic)),
+    where: pickedSuburbs((p.where ?? "").split(",")).slice(0, MAX_SUBURBS).map((s) => s.name),
     when: unique((p.when ?? "").split(",").filter(isWhen)),
   };
 }
@@ -452,10 +482,12 @@ export function answersFromStored(value: unknown): Answers {
   const v = value as Record<string, unknown>;
   const strings = (x: unknown) =>
     Array.isArray(x) ? x.filter((s): s is string => typeof s === "string") : [];
+  // Saved before music and suburbs took more than one: a single string.
+  const oneOrList = (x: unknown) => (typeof x === "string" ? [x] : strings(x));
   return {
     goals: unique(strings(v.goals).filter(isGoal)),
-    music: typeof v.music === "string" && isMusic(v.music) ? v.music : null,
-    where: typeof v.where === "string" ? (findSuburb(v.where)?.name ?? "") : "",
+    music: unique(oneOrList(v.music).filter(isMusic)),
+    where: pickedSuburbs(oneOrList(v.where)).slice(0, MAX_SUBURBS).map((s) => s.name),
     when: unique(strings(v.when).filter(isWhen)),
   };
 }
